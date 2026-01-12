@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // jobs 컬렉션: 읽기만 허용 (쓰기는 서버에서만)
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // crawl_logs 컬렉션: 서버에서만 접근
+    match /crawl_logs/{logId} {
+      allow read, write: if false;
+    }
+  }
+}
