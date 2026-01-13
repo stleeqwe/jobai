@@ -3,9 +3,12 @@ import { JobCardList } from './JobCardList'
 
 interface Props {
   message: Message
+  onLoadMore?: () => void
+  isLoadingMore?: boolean
+  showLoadMore?: boolean
 }
 
-export function MessageBubble({ message }: Props) {
+export function MessageBubble({ message, onLoadMore, isLoadingMore, showLoadMore }: Props) {
   const isUser = message.role === 'user'
 
   return (
@@ -36,7 +39,12 @@ export function MessageBubble({ message }: Props) {
         {/* 채용공고 목록 */}
         {!isUser && message.jobs && message.jobs.length > 0 && (
           <div className="mt-3">
-            <JobCardList jobs={message.jobs} />
+            <JobCardList
+              jobs={message.jobs}
+              pagination={message.pagination}
+              onLoadMore={showLoadMore ? onLoadMore : undefined}
+              isLoadingMore={isLoadingMore}
+            />
           </div>
         )}
 

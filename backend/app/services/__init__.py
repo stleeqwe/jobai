@@ -1,10 +1,13 @@
 from .gemini import gemini_service
-from .job_search import search_jobs_in_db, get_job_stats
-from .location import estimate_reachable_locations
+from .job_search import get_all_active_jobs, filter_by_salary, format_job_results, get_job_stats
+from .maps import maps_service, check_maps_api
 
 __all__ = [
     "gemini_service",
-    "search_jobs_in_db",
+    "get_all_active_jobs",
+    "filter_by_salary",
+    "format_job_results",
     "get_job_stats",
-    "estimate_reachable_locations",
+    "maps_service",
+    "check_maps_api",
 ]

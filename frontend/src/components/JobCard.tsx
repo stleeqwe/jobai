@@ -30,6 +30,12 @@ export function JobCard({ job, index }: Props) {
 
       {/* 조건 태그 */}
       <div className="flex flex-wrap gap-1.5 text-xs">
+        {/* V3: 이동시간 표시 (Maps API 결과) */}
+        {job.travel_time_minutes !== undefined && (
+          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-medium">
+            🚇 {job.travel_time_text || `${job.travel_time_minutes}분`}
+          </span>
+        )}
         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
           {job.location}
         </span>

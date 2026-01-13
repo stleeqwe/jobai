@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { Message } from '../types'
+import { useState, useCallback, useRef } from 'react'
+import { Message, Job, PaginationInfo, Coordinates } from '../types'
 import { chatApi } from '../services/api'
 
 const INITIAL_MESSAGE: Message = {
@@ -15,13 +15,30 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date()
 }
 
-export function useChat() {
+interface SearchContext {
+  message: string
+  pagination: PaginationInfo
+  allJobs: Job[]
+  userCoordinates?: Coordinates | null
+}
+
+interface UseChatOptions {
+  userCoordinates?: Coordinates | null
+}
+
+export function useChat(options: UseChatOptions = {}) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const sendMessage = useCallback(async (content: string) => {
+  // 현재 검색 컨텍스트 저장 (더 보기용)
+  const searchContextRef = useRef<SearchContext | null>(null)
+
+  const sendMessage = useCallback(async (content: string, coordinates?: Coordinates | null) => {
+    // 좌표는 파라미터로 받은 것 우선, 없으면 옵션에서
+    const userCoordinates = coordinates ?? options.userCoordinates
     // 사용자 메시지 추가
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -36,7 +53,21 @@ export function useChat() {
     setError(null)
 
     try {
-      const response = await chatApi.send(content, conversationId)
+      const response = await chatApi.send({
+        message: content,
+        conversationId,
+        page: 1,
+        pageSize: 20,
+        userCoordinates
+      })
+
+      // 검색 컨텍스트 저장
+      searchContextRef.current = {
+        message: content,
+        pagination: response.pagination,
+        allJobs: response.jobs,
+        userCoordinates
+      }
 
       // AI 응답 추가
       const assistantMessage: Message = {
@@ -44,6 +75,7 @@ export function useChat() {
         role: 'assistant',
         content: response.response,
         jobs: response.jobs,
+        pagination: response.pagination,
         timestamp: new Date()
       }
 
@@ -66,6 +98,57 @@ export function useChat() {
     } finally {
       setIsLoading(false)
     }
+  }, [conversationId, options.userCoordinates])
+
+  const loadMoreJobs = useCallback(async () => {
+    const context = searchContextRef.current
+    if (!context || !context.pagination.has_next) return
+
+    setIsLoadingMore(true)
+
+    try {
+      const nextPage = context.pagination.page + 1
+      const response = await chatApi.send({
+        message: context.message,
+        conversationId,
+        page: nextPage,
+        pageSize: 20,
+        userCoordinates: context.userCoordinates
+      })
+
+      // 새 공고들을 기존에 추가
+      const newAllJobs = [...context.allJobs, ...response.jobs]
+
+      // 컨텍스트 업데이트
+      searchContextRef.current = {
+        ...context,
+        pagination: response.pagination,
+        allJobs: newAllJobs
+      }
+
+      // 마지막 AI 메시지 업데이트
+      setMessages(prev => {
+        const newMessages = [...prev]
+        // 마지막 assistant 메시지 찾기
+        for (let i = newMessages.length - 1; i >= 0; i--) {
+          if (newMessages[i].role === 'assistant' && newMessages[i].jobs.length > 0) {
+            newMessages[i] = {
+              ...newMessages[i],
+              jobs: newAllJobs,
+              pagination: response.pagination
+            }
+            break
+          }
+        }
+        return newMessages
+      })
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '더 불러오기 실패'
+      setError(errorMessage)
+    } finally {
+      setIsLoadingMore(false)
+    }
   }, [conversationId])
 
   const clearError = useCallback(() => {
@@ -76,13 +159,16 @@ export function useChat() {
     setMessages([INITIAL_MESSAGE])
     setConversationId(null)
     setError(null)
+    searchContextRef.current = null
   }, [])
 
   return {
     messages,
     isLoading,
+    isLoadingMore,
     error,
     sendMessage,
+    loadMoreJobs,
     clearError,
     resetChat
   }

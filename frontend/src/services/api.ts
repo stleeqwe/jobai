@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import { ChatResponse } from '../types'
+import { ChatResponse, Coordinates } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -8,15 +8,27 @@ const client = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 30000
+  timeout: 60000  // 2-Stage 처리로 인해 타임아웃 증가
 })
 
+export interface ChatRequestParams {
+  message: string
+  conversationId: string | null
+  page?: number
+  pageSize?: number
+  userCoordinates?: Coordinates | null  // 사용자 GPS 좌표
+}
+
 export const chatApi = {
-  send: async (message: string, conversationId: string | null): Promise<ChatResponse> => {
+  send: async (params: ChatRequestParams): Promise<ChatResponse> => {
     try {
       const response = await client.post<ChatResponse>('/chat', {
-        message,
-        conversation_id: conversationId
+        message: params.message,
+        conversation_id: params.conversationId,
+        page: params.page || 1,
+        page_size: params.pageSize || 20,
+        user_lat: params.userCoordinates?.latitude,
+        user_lng: params.userCoordinates?.longitude
       })
       return response.data
     } catch (error) {

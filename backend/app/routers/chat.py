@@ -1,10 +1,15 @@
-"""채팅 API 라우터"""
+"""채팅 API 라우터 - V3 (3-Stage Sequential Filter with Maps API)"""
 
 import uuid
 import logging
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import ChatRequest, ChatResponse, JobItem
+from app.models.schemas import (
+    ChatRequest,
+    ChatResponse,
+    JobItem,
+    PaginationInfo
+)
 from app.services.gemini import gemini_service
 
 router = APIRouter()
@@ -16,9 +21,19 @@ async def chat(request: ChatRequest):
     """
     사용자 메시지를 받아 AI 응답과 매칭된 채용공고 반환
 
-    - 자연어로 채용 조건 입력
-    - Gemini가 조건 파싱 후 DB 검색
-    - 검색 결과와 AI 응답 반환
+    V3 아키텍처:
+    - Phase 0: 필수 정보 수집 (직무, 연봉, 지역)
+    - Stage 1: 직무 필터 (AI 의미적 매칭)
+    - Stage 2: 연봉 필터 (DB, NULL 포함)
+    - Stage 3: 지역 필터 (Maps API 이동시간)
+
+    Args:
+        request.message: 자연어 채용 조건
+        request.page: 페이지 번호 (기본 1)
+        request.page_size: 페이지당 결과 수 (기본 20)
+
+    Returns:
+        AI 응답, 채용공고 리스트 (이동시간 포함), 페이지네이션 정보
     """
     try:
         # 대화 ID 생성 또는 사용
@@ -31,21 +46,33 @@ async def chat(request: ChatRequest):
         if len(request.message) > 1000:
             raise HTTPException(status_code=400, detail="메시지가 너무 깁니다. (최대 1000자)")
 
-        # Gemini 처리
-        result = await gemini_service.process_message(request.message.strip())
+        # 사용자 좌표 (있으면)
+        user_coords = None
+        if request.user_lat is not None and request.user_lng is not None:
+            user_coords = (request.user_lat, request.user_lng)
+
+        # Gemini 처리 (V3: 3-Stage Filter + 대화 컨텍스트 유지)
+        result = await gemini_service.process_message(
+            message=request.message.strip(),
+            conversation_id=conversation_id,
+            page=request.page,
+            page_size=request.page_size,
+            user_coordinates=user_coords
+        )
 
         if not result["success"]:
             logger.error(f"Gemini 처리 실패: {result.get('error')}")
 
         # 응답 구성
         jobs = [JobItem(**job) for job in result["jobs"]]
+        pagination = PaginationInfo(**result["pagination"])
 
         return ChatResponse(
             success=result["success"],
             response=result["response"],
             jobs=jobs,
-            total_count=len(jobs),
-            search_params=result["search_params"],
+            pagination=pagination,
+            search_params=result.get("search_params", {}),
             conversation_id=conversation_id,
             error=result.get("error")
         )

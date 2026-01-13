@@ -1,11 +1,17 @@
-"""Gemini API 서비스 모듈"""
+"""Gemini API 서비스 모듈 - V3.2 (Single Function Call)"""
 
+import json
+import logging
+import re
 import google.generativeai as genai
 from google.generativeai.types import FunctionDeclaration, Tool
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.config import settings
-from app.services.job_search import search_jobs_in_db
+from app.services.job_search import get_all_active_jobs, filter_by_salary, format_job_results
+from app.services.maps import maps_service
+
+logger = logging.getLogger(__name__)
 
 # API 키 설정
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -15,7 +21,6 @@ def _convert_proto_to_dict(proto_obj) -> Dict[str, Any]:
     """protobuf 객체를 Python dict로 변환"""
     result = {}
     for key, value in proto_obj.items():
-        # RepeatedComposite (배열) 처리
         if hasattr(value, '__iter__') and not isinstance(value, (str, bytes)):
             try:
                 result[key] = list(value)
@@ -25,204 +30,736 @@ def _convert_proto_to_dict(proto_obj) -> Dict[str, Any]:
             result[key] = value
     return result
 
-# Function Calling 정의
+
+# =============================================================================
+# Single Function: 모든 파라미터를 한 번에 추출
+# =============================================================================
 SEARCH_JOBS_FUNCTION = FunctionDeclaration(
     name="search_jobs",
     description="""
-    채용공고 데이터베이스에서 조건에 맞는 공고를 검색합니다.
-    조건이 없는 필드는 생략하면 해당 조건 없이 검색합니다.
-    사용자가 조건을 언급하면 반드시 이 함수를 호출해야 합니다.
+    채용공고를 검색합니다. 사용자가 직무, 연봉, 위치 조건을 언급하면 호출하세요.
+    모든 조건을 한 번에 파라미터로 전달합니다.
     """,
     parameters={
         "type": "object",
         "properties": {
             "job_type": {
                 "type": "string",
-                "description": "정규화된 직무명 (예: 웹디자이너, 백엔드, 프론트엔드, 마케터, 영업, 데이터분석가)"
-            },
-            "job_keywords": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "직무 관련 기술/스킬 키워드 (예: React, Python, Figma, AWS)"
-            },
-            "job_category": {
-                "type": "string",
-                "enum": ["IT개발", "디자인", "마케팅", "영업", "경영지원", "기획", "서비스", "기타"],
-                "description": "직무 대분류"
-            },
-            "preferred_locations": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "선호 지역 (구/시 단위, 예: 강남구, 서초구, 성남시)"
-            },
-            "user_location": {
-                "type": "string",
-                "description": "사용자 출발 위치 (동/역 단위, 예: 천호동, 강남역, 홍대입구)"
-            },
-            "commute_time_minutes": {
-                "type": "integer",
-                "description": "최대 통근시간 (분 단위)"
-            },
-            "experience_type": {
-                "type": "string",
-                "enum": ["신입", "경력", "경력무관"],
-                "description": "경력 조건"
-            },
-            "experience_years_min": {
-                "type": "integer",
-                "description": "최소 경력 연차 (경력인 경우)"
+                "description": "찾는 직무/직종 (예: '앱 개발자', '백엔드 엔지니어', 'UI/UX 디자이너')"
             },
             "salary_min": {
                 "type": "integer",
-                "description": "최소 연봉 (만원 단위, 예: 4000 = 4천만원)"
+                "description": "최소 연봉 (만원 단위). 0이면 연봉 무관. 예: 5000 = 5천만원"
             },
-            "employment_type": {
+            "location_query": {
                 "type": "string",
-                "enum": ["정규직", "계약직", "인턴", "프리랜서", "아르바이트"],
-                "description": "고용형태"
+                "description": "사용자가 언급한 위치/거리 조건 원문. 예: '강남역에서 30분', '판교', '화양동 100번지 근처'. 현재 위치 기반이면 빈 문자열"
             },
-            "limit": {
+            "use_current_location": {
+                "type": "boolean",
+                "description": "사용자가 현재 위치 기반 검색을 원하면 true. 예: '내 위치에서', '여기서', '우리집에서', '출퇴근 가능한', '집 근처' 등"
+            },
+            "max_commute_minutes": {
                 "type": "integer",
-                "description": "검색 결과 최대 개수 (기본값 10)"
+                "description": "최대 통근시간 (분). 사용자가 '30분 이내'라고 하면 30, '1시간'이면 60. 기본값 60"
             }
-        }
+        },
+        "required": ["job_type", "salary_min"]
     }
 )
 
+
+# =============================================================================
+# System Prompt - 단순화
+# =============================================================================
 SYSTEM_PROMPT = """
 너는 채용공고 검색을 도와주는 AI 어시스턴트 "잡챗"이야.
-사용자가 원하는 채용 조건을 파악해서 search_jobs 함수를 호출해.
 
-## 역할
-1. 사용자의 자연어 입력에서 채용 조건을 정확히 추출
-2. search_jobs 함수를 호출하여 DB 검색
-3. 검색 결과를 친근하고 자연스럽게 소개
+## 핵심 규칙 (매우 중요!)
 
-## 조건 추출 규칙
+1. 사용자가 직무와 연봉 조건을 모두 말하면 **즉시** search_jobs 함수를 호출해.
+2. "잠시만요", "기다려주세요" 같은 말 없이 바로 함수를 호출해야 해.
+3. **함수는 반드시 한 번만 호출해.** 여러 직무를 요청해도 하나의 search_jobs 호출에 모든 직무를 포함해.
+4. **"개발자", "디자이너" 같은 넓은 직무도 그대로 검색해.** 구체적인 직무를 다시 묻지 마.
 
-### 위치 처리
-- "강남 근처" → preferred_locations: ["강남구", "서초구", "송파구"]
-- "판교" → preferred_locations: ["성남시"]
-- "천호동에서 1시간 이내" → user_location: "천호동", commute_time_minutes: 60
-- 위치 언급 없으면 → 조건 없이 전체 검색
+예시 (즉시 함수 호출):
+- "마케터 찾아줘, 연봉 무관" → 즉시 search_jobs(job_type="마케터", salary_min=0)
+- "개발자 또는 디자이너, 연봉 무관" → 즉시 search_jobs(job_type="개발자 또는 디자이너", salary_min=0)
+- "디자이너 아니면 개발자, 연봉 무관" → 즉시 search_jobs(job_type="디자이너 아니면 개발자", salary_min=0)
+- "내 위치에서 1시간 이내 개발자, 연봉 5천" → 즉시 search_jobs 호출
 
-### 연봉 처리
-- "연봉 4천 이상" → salary_min: 4000
-- "5천만원 이상" → salary_min: 5000
-- "월 300 이상" → salary_min: 3600 (연봉 환산)
-- 연봉 언급 없으면 → 조건 없이 검색
+예시 (추가 질문 필요):
+- "웹디자이너" → 연봉 정보 없음 → "희망 연봉 조건이 있으신가요?"
+- "연봉 5천 이상 찾아줘" → 직무 없음 → "어떤 직무를 찾으시나요?"
 
-### 경력 처리
-- "신입" → experience_type: "신입"
-- "3년차", "경력 3년" → experience_type: "경력", experience_years_min: 3
-- 경력 언급 없으면 → 조건 없이 검색
+## 검색 방법
 
-### 직무 처리
-- 구체적 직무명 사용: 웹디자이너, 백엔드, 프론트엔드, 마케터, 데이터분석가 등
-- 기술 스택이 있으면 job_keywords에 추가: React, Python, Figma 등
+search_jobs 함수 파라미터:
 
-## 중요 규칙
-1. 사용자가 채용공고를 찾는다고 하면 반드시 search_jobs를 호출해
-2. 조건이 불명확해도 일단 검색 시도 (조건 없는 필드는 생략)
-3. 검색 결과가 없으면 조건 완화를 친절하게 제안
-4. 검색 결과가 있으면 간략히 요약하고 주요 공고를 소개
+- job_type: 찾는 직무 (필수) - 여러 직무면 그대로 전달 (예: "개발자 아니면 디자이너")
+- salary_min: 최소 연봉, 만원 단위 (필수, 무관이면 0)
+- location_query: 위치 조건 원문 (선택, 있으면 그대로 전달)
+- max_commute_minutes: 최대 통근시간 (선택, 기본 60분)
+
+## 위치 조건 예시
+
+사용자 입력 → location_query 파라미터
+
+"어린이대공원역에서 1시간 이내" → "어린이대공원역", max_commute_minutes: 60
+"강남역 30분 거리" → "강남역", max_commute_minutes: 30
+"구의동이나 아차산로에서 30분" → "구의동이나 아차산로", max_commute_minutes: 30
+"화양동 100번지 근처" → "화양동 100번지", max_commute_minutes: 60
+"판교 출퇴근 가능한" → "판교", max_commute_minutes: 60
+"내 위치에서 30분" → "내 위치", max_commute_minutes: 30
+"여기서 1시간 이내" → "여기서", max_commute_minutes: 60
+"현재 위치 기준 40분" → "현재 위치", max_commute_minutes: 40
+
+location_query는 사용자가 말한 위치 부분을 그대로 전달해. 파싱은 시스템이 처리해.
+"내 위치", "여기서", "현재 위치" 같은 표현은 사용자의 GPS 위치를 사용함.
+
+## 연봉 처리
+
+사용자가 연봉 조건을 언급하면 의미를 해석해서 salary_min 설정:
+- 구체적인 금액 언급 → 해당 금액 (만원 단위)
+- 조건 없음/유연함을 표현 → salary_min: 0 (예: 무관, 협상, 협의, 면접 후, 상관없음 등)
+
+## 정보 수집
+
+필요한 정보가 부족하면 친절하게 물어봐:
+- 직무가 없으면: "어떤 직무를 찾으시나요?"
+- 연봉이 없으면: "희망 연봉 조건이 있으신가요? (없으면 '무관'이라고 해주세요)"
+
+위치 조건은 선택사항이야. 없으면 전국 검색.
 
 ## 응답 스타일
+
 - 존댓말 사용
 - 친근하고 자연스럽게
-- 결과가 많으면 상위 3~5개만 하이라이트
-- 결과가 없으면 대안 제시
+- 결과가 있으면 핵심 공고 몇 개 하이라이트
+- 결과가 없으면 조건 완화 제안
+"""
+
+
+# =============================================================================
+# Stage 1: 직무 필터용 프롬프트
+# =============================================================================
+SELECT_JOBS_BY_TYPE_PROMPT = """
+다음 채용공고 목록에서 "{job_type}"에 해당하는 공고만 선별하세요.
+
+## 핵심 원칙 (매우 중요!)
+1. 제목과 직무 설명에 "{job_type}" 관련 키워드가 명확히 있어야만 포함
+2. 의심스러우면 무조건 제외
+3. "병리사", "간호사", "약사" 등 의료직은 절대 디자이너/개발자/마케터가 아님
+
+### 직무 매칭 예시
+
+**"프론트 앱 개발자" 또는 "앱 개발자"**
+✅ 포함: Flutter, React Native, iOS, Android, 모바일 앱 개발
+❌ 제외: 웹 프론트엔드, 백엔드, 디자이너, 기획자
+
+**"백엔드 개발자" 또는 "서버 개발자"**
+✅ 포함: Java 백엔드, Node.js, Python 서버, Spring, Django
+❌ 제외: 프론트엔드, 앱 개발, 디자이너
+
+**"웹 프론트엔드" 또는 "웹 개발자"**
+✅ 포함: React, Vue.js, Angular, 웹퍼블리셔
+❌ 제외: 앱 개발자, 백엔드, 디자이너
+
+**"디자이너"**
+✅ 포함: UI/UX 디자이너, 웹디자이너, 그래픽 디자이너, 제품 디자이너, 패션 디자이너, 인테리어 디자이너
+❌ 제외: 개발자, 기획자, 마케터, 의료직(간호사, 병리사 등), 사무직, 영업직, 서비스직
+
+**"마케터"**
+✅ 포함: 퍼포먼스 마케터, 콘텐츠 마케터, 디지털 마케팅, 광고 기획
+❌ 제외: 디자이너, 개발자, 의료직, 사무직
+
+## 절대 포함하면 안 되는 직종
+- 의료/보건: 간호사, 병리사, 약사, 의사, 물리치료사
+- 서비스: 바리스타, 요리사, 미용사, 상담사
+- 사무/행정: 경리, 총무, 비서, 회계
+- 영업/판매: 영업사원, 판매원, 텔레마케터
+
+## 후보 공고 목록
+{candidates}
+
+## 응답 형식
+반드시 JSON 배열로만 응답하세요. 설명 없이 ID만:
+["jk_123", "jk_456", ...]
+
+관련 공고가 없으면:
+[]
+"""
+
+
+# =============================================================================
+# 위치 파싱용 프롬프트 (Backend에서 별도 AI 호출)
+# =============================================================================
+PARSE_LOCATION_PROMPT = """
+다음 위치 표현에서 출발지 목록을 추출하세요.
+
+입력: "{location_query}"
+
+## 예시
+- "강남역" → ["강남역"]
+- "구의동이나 아차산로" → ["구의동", "아차산로"]
+- "판교나 강남쪽" → ["판교", "강남"]
+- "화양동 100번지" → ["화양동 100번지"]
+- "어린이대공원역" → ["어린이대공원역"]
+- "광진구" → ["광진구"]
+
+## 응답 형식
+JSON 배열만 응답하세요:
+["위치1", "위치2"]
+"""
+
+
+# =============================================================================
+# 직무 파싱용 프롬프트 (맥락 이해)
+# =============================================================================
+PARSE_JOB_TYPES_PROMPT = """
+사용자의 직무 요청을 분석하여 검색할 직무 목록을 추출하세요.
+
+입력: "{job_type_query}"
+
+## 핵심 원칙
+1. 명확히 다른 직무를 OR로 연결한 경우 → 분리
+2. 같은 분야의 세부 조건/선호도인 경우 → 하나로 통합 (맥락 포함)
+
+## 예시
+
+입력: "웹디자이너 혹은 편집디자이너"
+→ ["웹디자이너", "편집디자이너"]
+(이유: 명확히 다른 두 직무를 OR로 연결)
+
+입력: "개발자 아니면 디자이너"
+→ ["개발자", "디자이너"]
+(이유: 완전히 다른 직군)
+
+입력: "디자이너 아니면 개발자, 연봉 무관"
+→ ["디자이너", "개발자"]
+(이유: 완전히 다른 직군, 연봉 조건은 무시)
+
+입력: "풀스택 개발자, 특히 앱 풀스택, iOS Android 상관없어"
+→ ["풀스택 개발자 (모바일 앱 중심)"]
+(이유: 같은 풀스택 분야 + 세부 선호도 → 통합)
+
+입력: "ai나 머신러닝 엔지니어, 데이터 사이언스 위주"
+→ ["AI/ML/데이터 사이언스 엔지니어"]
+(이유: 모두 데이터/AI 분야 → 통합)
+
+입력: "마케터나 기획자, 스타트업 경험자"
+→ ["마케터 (스타트업)", "기획자 (스타트업)"]
+(이유: 다른 직무 + 공통 조건 → 분리 후 조건 적용)
+
+입력: "프론트엔드 개발자"
+→ ["프론트엔드 개발자"]
+(이유: 단일 직무)
+
+입력: "백엔드 개발자나 서버 개발자"
+→ ["백엔드/서버 개발자"]
+(이유: 같은 직무의 다른 표현 → 통합)
+
+## 응답 형식
+JSON 배열만 응답하세요:
+["직무1", "직무2"]
 """
 
 
 class GeminiService:
-    """Gemini API 서비스"""
+    """Gemini API 서비스 - V3.2 (Single Function Call)"""
 
     def __init__(self):
-        self.model = genai.GenerativeModel(
+        # Single Function Call용 모델
+        self.chat_model = genai.GenerativeModel(
             model_name=settings.GEMINI_MODEL,
             tools=[Tool(function_declarations=[SEARCH_JOBS_FUNCTION])],
             system_instruction=SYSTEM_PROMPT
         )
+        # 직무 필터용 모델
+        self.filter_model = genai.GenerativeModel(
+            model_name=settings.GEMINI_MODEL
+        )
+        # 대화 히스토리 저장소
+        self._conversations: Dict[str, List] = {}
 
-    async def process_message(self, message: str) -> Dict[str, Any]:
+    async def process_message(
+        self,
+        message: str,
+        conversation_id: str = "",
+        page: int = 1,
+        page_size: int = 20,
+        user_coordinates: Optional[tuple] = None
+    ) -> Dict[str, Any]:
         """
-        사용자 메시지를 처리하고 검색 결과와 응답을 반환
+        V3.2: Single Function Call
+
+        모든 검색 조건(직무, 연봉, 위치)을 한 번의 Function Call로 추출
+        위치 파싱은 Backend에서 별도 처리
 
         Args:
             message: 사용자 메시지
+            conversation_id: 대화 ID
+            page: 페이지 번호
+            page_size: 페이지당 결과 수
+            user_coordinates: 사용자 GPS 좌표 (lat, lng) - Geolocation API
 
         Returns:
-            {
-                "response": AI 응답 텍스트,
-                "jobs": 채용공고 리스트,
-                "search_params": 검색에 사용된 파라미터,
-                "success": 성공 여부
-            }
+            응답 데이터
         """
         try:
-            # 대화 시작
-            chat = self.model.start_chat()
+            # 대화 히스토리 복원
+            history = self._conversations.get(conversation_id, [])
+            chat = self.chat_model.start_chat(history=history)
 
-            # 첫 번째 응답 받기
+            # 메시지 전송
             response = chat.send_message(message)
 
-            jobs = []
             search_params = {}
+            final_jobs = []
 
-            # Function Call 처리
-            for part in response.parts:
-                if hasattr(part, "function_call") and part.function_call:
-                    fn = part.function_call
+            # Function Call 처리 (다중 function call 안전 처리)
+            function_calls = self._extract_function_calls(response)
 
-                    # 검색 파라미터 추출 (protobuf 객체를 Python 네이티브 타입으로 변환)
-                    if fn.args:
-                        search_params = _convert_proto_to_dict(fn.args)
-                    else:
-                        search_params = {}
+            if function_calls:
+                # 다중 function call 경고
+                if len(function_calls) > 1:
+                    logger.warning(f"다중 Function Call 감지: {len(function_calls)}개. 첫 번째만 처리하고 모두에게 응답합니다.")
 
-                    # DB 검색 실행
-                    jobs = await search_jobs_in_db(search_params)
+                # 첫 번째 search_jobs function call 처리
+                search_call = None
+                for fc in function_calls:
+                    if fc.name == "search_jobs":
+                        search_call = fc
+                        break
 
-                    # 검색 결과를 모델에 다시 전달
-                    response = chat.send_message(
-                        genai.protos.Content(
-                            parts=[
-                                genai.protos.Part(
-                                    function_response=genai.protos.FunctionResponse(
-                                        name="search_jobs",
-                                        response={
-                                            "jobs": jobs[:10],
-                                            "total_count": len(jobs),
-                                            "search_params": search_params
-                                        }
-                                    )
-                                )
-                            ]
-                        )
+                if search_call:
+                    fn_args = _convert_proto_to_dict(search_call.args) if search_call.args else {}
+                    logger.info(f"Function Call: search_jobs, args: {fn_args}")
+
+                    # 파라미터 추출
+                    job_type = fn_args.get("job_type", "")
+                    salary_min = int(fn_args.get("salary_min", 0))
+                    location_query = fn_args.get("location_query", "")
+                    use_current_location = bool(fn_args.get("use_current_location", False))
+                    max_minutes = int(fn_args.get("max_commute_minutes", 60))
+
+                    search_params = {
+                        "job_type": job_type,
+                        "salary_min": salary_min,
+                        "location_query": location_query,
+                        "use_current_location": use_current_location,
+                        "max_commute_minutes": max_minutes,
+                        "user_coordinates": user_coordinates
+                    }
+
+                    # 3-Stage 필터링 파이프라인 실행
+                    result = await self._execute_search_pipeline(
+                        job_type=job_type,
+                        salary_min=salary_min,
+                        location_query=location_query,
+                        use_current_location=use_current_location,
+                        max_minutes=max_minutes,
+                        user_coordinates=user_coordinates
                     )
 
-            # 최종 텍스트 응답 추출
-            response_text = ""
-            for part in response.parts:
-                if hasattr(part, "text") and part.text:
-                    response_text += part.text
+                    final_jobs = result["jobs"]
+
+                    # 모든 function call에 대해 응답 생성 (다중 function call 오류 방지)
+                    response_data = {
+                        "total_count": len(final_jobs),
+                        "jobs": result["sample_jobs"],
+                        "location_filtered": result.get("location_filtered", False),
+                        "origins_used": result.get("origins", []),
+                        "job_types_parsed": result.get("job_types_parsed", [])
+                    }
+
+                    # 각 function call에 대한 응답 파트 생성
+                    response_parts = []
+                    for fc in function_calls:
+                        response_parts.append(
+                            genai.protos.Part(
+                                function_response=genai.protos.FunctionResponse(
+                                    name=fc.name,
+                                    response=response_data
+                                )
+                            )
+                        )
+
+                    # AI에게 결과 전달
+                    response = chat.send_message(
+                        genai.protos.Content(parts=response_parts)
+                    )
+
+            # 최종 응답 텍스트 추출
+            response_text = self._extract_text_response(response)
+
+            # 대화 히스토리 저장
+            if conversation_id:
+                self._conversations[conversation_id] = chat.history
+
+            # 페이지네이션
+            total_count = len(final_jobs)
+            total_pages = max(1, (total_count + page_size - 1) // page_size)
+            page = max(1, min(page, total_pages))
+
+            start_idx = (page - 1) * page_size
+            end_idx = start_idx + page_size
+            page_jobs = final_jobs[start_idx:end_idx]
+
+            # 결과 포맷팅
+            formatted_jobs = format_job_results(page_jobs)
 
             return {
                 "response": response_text,
-                "jobs": jobs,
+                "jobs": formatted_jobs,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_count": total_count,
+                    "total_pages": total_pages,
+                    "has_next": page < total_pages,
+                    "has_prev": page > 1
+                },
                 "search_params": search_params,
                 "success": True
             }
 
         except Exception as e:
+            logger.exception(f"process_message 오류: {e}")
             return {
                 "response": "죄송합니다. 처리 중 오류가 발생했습니다. 다시 시도해주세요.",
                 "jobs": [],
+                "pagination": self._empty_pagination(page_size),
                 "search_params": {},
                 "success": False,
                 "error": str(e)
             }
+
+    async def _execute_search_pipeline(
+        self,
+        job_type: str,
+        salary_min: int,
+        location_query: str,
+        max_minutes: int,
+        user_coordinates: Optional[tuple] = None,
+        use_current_location: bool = False
+    ) -> Dict[str, Any]:
+        """
+        3-Stage 검색 파이프라인 실행
+
+        Stage 0: 직무 파싱 (AI) - 복수 직무 지원
+        Stage 1: 직무 필터 (AI) - 각 직무별 실행 후 합집합
+        Stage 2: 연봉 필터 (DB)
+        Stage 3: 거리 필터 (Maps API) - location_query 또는 GPS 좌표가 있을 때
+
+        Args:
+            job_type: 직무 유형
+            salary_min: 최소 연봉
+            location_query: 위치 조건 원문
+            max_minutes: 최대 통근시간
+            user_coordinates: GPS 좌표 (lat, lng)
+            use_current_location: AI가 판단한 현재 위치 사용 여부
+
+        Returns:
+            필터링된 공고 목록
+        """
+        logger.info(f"Pipeline 시작: job_type={job_type}, salary_min={salary_min}, "
+                   f"location_query={location_query}, use_current_location={use_current_location}, "
+                   f"max_minutes={max_minutes}, user_coordinates={user_coordinates}")
+
+        # 전체 활성 공고 가져오기
+        all_jobs = await get_all_active_jobs()
+        logger.info(f"전체 활성 공고: {len(all_jobs)}건")
+
+        if not all_jobs:
+            return {"jobs": [], "sample_jobs": [], "location_filtered": False, "origins": [], "job_types_parsed": []}
+
+        # Stage 0: 직무 파싱 (복수 직무 지원)
+        job_types = await self._parse_job_types(job_type)
+        logger.info(f"Stage 0 (직무 파싱): {job_types}")
+
+        # Stage 1: 직무 필터 (AI) - 각 직무별 실행 후 합집합
+        stage1_jobs_dict = {}  # 중복 제거용
+
+        for jt in job_types:
+            filtered = await self._filter_by_job_type(jt, all_jobs)
+            logger.info(f"Stage 1 '{jt}' 결과: {len(filtered)}건")
+            for job in filtered:
+                job_id = job.get("id")
+                if job_id and job_id not in stage1_jobs_dict:
+                    stage1_jobs_dict[job_id] = job
+
+        stage1_jobs = list(stage1_jobs_dict.values())
+        logger.info(f"Stage 1 (직무 필터 합집합): {len(stage1_jobs)}건")
+
+        # Stage 2: 연봉 필터
+        stage2_jobs = filter_by_salary(stage1_jobs, salary_min)
+        logger.info(f"Stage 2 (연봉 필터): {len(stage2_jobs)}건")
+
+        # Stage 3: 거리 필터
+        final_jobs = stage2_jobs
+        origins = []
+        location_filtered = False
+        use_gps = False
+
+        if maps_service.is_available():
+            # GPS 좌표 사용 여부: AI가 판단한 use_current_location 플래그 사용
+            use_gps = user_coordinates and use_current_location
+
+            if use_gps:
+                # GPS 좌표로 거리 필터
+                origin_str = f"{user_coordinates[0]},{user_coordinates[1]}"
+                logger.info(f"GPS 좌표 사용: {origin_str}")
+                stage3_jobs = await self._filter_by_distance(
+                    stage2_jobs, [origin_str], max_minutes, is_coordinates=True
+                )
+                logger.info(f"Stage 3 (GPS 거리 필터): {len(stage3_jobs)}건")
+                final_jobs = stage3_jobs
+                location_filtered = True
+                origins = ["내 위치 (GPS)"]
+
+            elif location_query:
+                # 텍스트 위치로 거리 필터
+                origins = await self._parse_location_query(location_query)
+                logger.info(f"파싱된 출발지: {origins}")
+
+                if origins:
+                    stage3_jobs = await self._filter_by_distance(stage2_jobs, origins, max_minutes)
+                    logger.info(f"Stage 3 (거리 필터): {len(stage3_jobs)}건")
+                    final_jobs = stage3_jobs
+                    location_filtered = True
+
+        # 샘플 공고 생성
+        sample_jobs = self._make_sample_jobs(final_jobs[:5])
+
+        return {
+            "jobs": final_jobs,
+            "sample_jobs": sample_jobs,
+            "location_filtered": location_filtered,
+            "origins": origins,
+            "used_gps": use_gps,
+            "job_types_parsed": job_types
+        }
+
+    async def _parse_location_query(self, location_query: str) -> List[str]:
+        """
+        위치 쿼리에서 출발지 목록 추출 (Backend AI 호출)
+
+        Args:
+            location_query: 사용자 위치 표현 원문
+
+        Returns:
+            출발지 목록
+        """
+        if not location_query:
+            return []
+
+        prompt = PARSE_LOCATION_PROMPT.format(location_query=location_query)
+
+        try:
+            response = self.filter_model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # JSON 배열 파싱
+            match = re.search(r'\[([^\]]*)\]', response_text, re.DOTALL)
+            if match:
+                array_str = "[" + match.group(1) + "]"
+                origins = json.loads(array_str)
+                return [o for o in origins if isinstance(o, str) and o.strip()]
+
+        except Exception as e:
+            logger.error(f"위치 파싱 오류: {e}")
+
+        # 파싱 실패 시 원문 그대로 사용
+        return [location_query]
+
+    async def _parse_job_types(self, job_type_query: str) -> List[str]:
+        """
+        직무 쿼리에서 검색할 직무 목록 추출 (맥락 이해 AI 파싱)
+
+        - 명확히 다른 직무 OR 연결 → 분리
+        - 같은 분야 세부 조건 → 통합
+
+        Args:
+            job_type_query: 사용자 직무 표현 원문
+
+        Returns:
+            직무 목록
+        """
+        if not job_type_query:
+            return []
+
+        prompt = PARSE_JOB_TYPES_PROMPT.format(job_type_query=job_type_query)
+
+        try:
+            response = self.filter_model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # JSON 배열 파싱
+            match = re.search(r'\[([^\]]*)\]', response_text, re.DOTALL)
+            if match:
+                array_str = "[" + match.group(1) + "]"
+                job_types = json.loads(array_str)
+                result = [jt for jt in job_types if isinstance(jt, str) and jt.strip()]
+                logger.info(f"직무 파싱: '{job_type_query}' → {result}")
+                return result
+
+        except Exception as e:
+            logger.error(f"직무 파싱 오류: {e}")
+
+        # 파싱 실패 시 원문 그대로 사용
+        return [job_type_query]
+
+    async def _filter_by_distance(
+        self,
+        jobs: List[Dict],
+        origins: List[str],
+        max_minutes: int,
+        is_coordinates: bool = False
+    ) -> List[Dict]:
+        """
+        Stage 3: 거리 필터 (복수 출발지 지원)
+
+        Args:
+            jobs: Stage 2 결과
+            origins: 출발 위치 목록 (주소 또는 "lat,lng" 형식)
+            max_minutes: 최대 통근시간
+            is_coordinates: True면 origins가 GPS 좌표임
+
+        Returns:
+            거리 조건 충족 공고 목록
+        """
+        if not jobs or not origins:
+            return jobs
+
+        # 복수 출발지에서 하나라도 조건 충족하면 포함 (Union)
+        all_matching_jobs = {}
+
+        for origin in origins:
+            filtered = await maps_service.filter_jobs_by_travel_time(
+                jobs, origin, max_minutes
+            )
+            for job in filtered:
+                job_id = job.get("id")
+                if job_id not in all_matching_jobs:
+                    all_matching_jobs[job_id] = job
+                else:
+                    # 더 짧은 이동시간으로 업데이트
+                    existing_time = all_matching_jobs[job_id].get("travel_time_minutes", 999)
+                    new_time = job.get("travel_time_minutes", 999)
+                    if new_time < existing_time:
+                        all_matching_jobs[job_id] = job
+
+        # 이동시간순 정렬
+        result_jobs = sorted(
+            all_matching_jobs.values(),
+            key=lambda x: x.get("travel_time_minutes", 999)
+        )
+
+        return result_jobs
+
+    async def _filter_by_job_type(
+        self,
+        job_type: str,
+        jobs: List[Dict]
+    ) -> List[Dict]:
+        """Stage 1: AI가 직무 유형으로 공고 필터링"""
+        if not job_type or not jobs:
+            return jobs
+
+        # 후보 목록 포맷팅 (최대 500건)
+        candidate_lines = []
+        for c in jobs[:500]:
+            job_id = c.get("id", "")
+            title = c.get("title", "")[:50]
+            job_type_raw = c.get("job_type_raw", "")[:30]
+            candidate_lines.append(f'[{job_id}] {title} ({job_type_raw})')
+
+        candidates_text = "\n".join(candidate_lines)
+
+        prompt = SELECT_JOBS_BY_TYPE_PROMPT.format(
+            job_type=job_type,
+            candidates=candidates_text
+        )
+
+        try:
+            response = self.filter_model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # JSON 배열 파싱
+            selected_ids = self._parse_id_array(response_text)
+
+            # 선택된 ID로 필터링
+            id_to_job = {j["id"]: j for j in jobs}
+            selected_jobs = [
+                id_to_job[job_id]
+                for job_id in selected_ids
+                if job_id in id_to_job
+            ]
+
+            return selected_jobs
+
+        except Exception as e:
+            logger.error(f"Stage 1 직무 필터 오류: {e}")
+            return jobs
+
+    def _make_sample_jobs(self, jobs: List[Dict]) -> List[Dict]:
+        """AI에게 보여줄 샘플 공고 생성"""
+        sample = []
+        for job in jobs:
+            sample.append({
+                "id": job.get("id", ""),
+                "title": job.get("title", "")[:40],
+                "company": job.get("company_name", ""),
+                "location": job.get("location_full", "") or job.get("location", ""),
+                "salary": job.get("salary_text", "협의"),
+                "travel_time": job.get("travel_time_text", "")
+            })
+        return sample
+
+    def _extract_function_calls(self, response) -> List:
+        """응답에서 모든 Function Call 추출"""
+        function_calls = []
+        for part in response.parts:
+            if hasattr(part, "function_call") and part.function_call:
+                function_calls.append(part.function_call)
+        return function_calls
+
+    def _extract_function_call(self, response):
+        """응답에서 첫 번째 Function Call 추출 (하위 호환)"""
+        calls = self._extract_function_calls(response)
+        return calls[0] if calls else None
+
+    def _parse_id_array(self, text: str) -> List[str]:
+        """응답 텍스트에서 ID 배열 추출"""
+        match = re.search(r'\[([^\]]*)\]', text, re.DOTALL)
+        if match:
+            try:
+                array_str = "[" + match.group(1) + "]"
+                return json.loads(array_str)
+            except json.JSONDecodeError:
+                pass
+        ids = re.findall(r'["\']([jk_\d]+)["\']', text)
+        return ids
+
+    def _extract_text_response(self, response) -> str:
+        """응답에서 텍스트 추출"""
+        response_text = ""
+        for part in response.parts:
+            if hasattr(part, "text") and part.text:
+                response_text += part.text
+        return response_text
+
+    def _empty_pagination(self, page_size: int) -> Dict[str, Any]:
+        """빈 페이지네이션 객체"""
+        return {
+            "page": 1,
+            "page_size": page_size,
+            "total_count": 0,
+            "total_pages": 0,
+            "has_next": False,
+            "has_prev": False
+        }
 
 
 def check_gemini() -> bool:

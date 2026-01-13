@@ -292,11 +292,11 @@ jobchat/
 }
 ```
 
-**Response (성공):**
+**Response (성공 - V2 아키텍처):**
 ```json
 {
   "success": true,
-  "response": "천호동 기준 1시간 이내 출퇴근 가능한 웹디자이너 채용공고 5건을 찾았습니다.",
+  "response": "천호동 기준 1시간 이내 출퇴근 가능한 웹디자이너 채용공고 23건을 찾았습니다.",
   "jobs": [
     {
       "id": "jk_12345678",
@@ -310,12 +310,19 @@ jobchat/
       "url": "https://www.jobkorea.co.kr/Recruit/GI_Read/12345678"
     }
   ],
-  "total_count": 5,
-  "search_params": {
-    "job_type": "웹디자이너",
+  "pagination": {
+    "page": 1,
+    "page_size": 20,
+    "total_count": 23,
+    "total_pages": 2,
+    "has_next": true,
+    "has_prev": false
+  },
+  "filter_params": {
     "locations": ["강남구", "송파구", "강동구"],
     "salary_min": 4000
   },
+  "job_query": "웹디자이너",
   "conversation_id": "uuid-xxxxx"
 }
 ```
@@ -379,127 +386,78 @@ jobchat/
 
 ---
 
-## Gemini Function Calling 스펙
+## 검색 아키텍처 V2 (2-Stage Hybrid)
 
-### System Prompt
+> **핵심 원칙**: DB는 숫자/범주 필터링, AI는 자연어 이해 담당
+
+### 아키텍처 개요
 
 ```
-너는 채용공고 검색을 도와주는 AI 어시스턴트 "잡챗"이야.
-사용자가 원하는 채용 조건을 파악해서 search_jobs 함수를 호출해.
-
-## 역할
-1. 사용자의 자연어 입력에서 채용 조건을 추출
-2. search_jobs 함수를 호출하여 DB 검색
-3. 검색 결과를 친근하고 자연스럽게 소개
-
-## 조건 추출 규칙
-
-### 위치 처리
-- "강남역 근처" → preferred_locations: ["강남구", "서초구"]
-- "2호선 라인" → preferred_locations: ["강남구", "서초구", "영등포구", "성동구", ...]
-- "천호동에서 1시간 이내" → user_location: "천호동", commute_time_minutes: 60
-  → 이 경우 천호동에서 대중교통 1시간 이내로 추정되는 구들을 preferred_locations에 포함
-
-### 연봉 처리
-- "연봉 4천 이상" → salary_min: 4000
-- "5천만원 이상" → salary_min: 5000
-- "4천~5천" → salary_min: 4000, salary_max: 5000
-- 월급 언급 시 연봉으로 환산 (월 300 = 연 3600)
-
-### 경력 처리
-- "신입" → experience_type: "신입"
-- "경력 3년" → experience_type: "경력", experience_years: 3
-- "경력무관" 또는 미언급 → experience_type: null (전체 검색)
-
-### 직무 처리
-- 직무명을 최대한 정규화하여 전달
-- "웹디자이너", "UI디자이너", "UX디자이너" → job_type: "웹디자이너" (대표 직무명)
-- 직무가 불명확하면 job_keywords에 키워드 포함
-
-## 응답 규칙
-1. 검색 결과가 있으면 친근하게 소개
-2. 검색 결과가 없으면 조건 완화를 제안
-3. 조건이 불명확하면 자연스럽게 질문
-4. 이모지는 과하지 않게 적절히 사용
-5. 존댓말 사용
-
-## 주의사항
-- 조건이 불명확해도 일단 검색 시도 (null로 두면 전체 검색)
-- 여러 조건 중 일부만 있어도 검색 가능
-- 결과가 너무 적으면 조건 완화 제안
+┌─────────────────────────────────────────────────────────────────┐
+│                      사용자 입력                                  │
+│  "강남역 근처 iOS 프론트 앱 개발자 연봉 5천만원 이상 공고 찾아줘"      │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 1: DB 필터링 (명확한 조건만)                               │
+│  - 위치: ["강남구", "서초구"]                                     │
+│  - 연봉: salary_min >= 5000                                     │
+│  - 직무(job_type): 필터 안 함 (AI에게 위임)                       │
+│  결과: 10,000건 → ~300건                                        │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 2: AI 선별 (직무 매칭)                                    │
+│  - 후보 공고 목록 (id, title)을 AI에게 전달                       │
+│  - AI가 "iOS 프론트 앱 개발자"에 해당하는 공고 선별                │
+│  결과: 300건 → 관련 있는 모든 공고 ID                             │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Stage 3: 결과 반환                                              │
+│  - 선별된 모든 공고 반환 (페이지네이션)                            │
+│  - 페이지당 20건                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Function Definition
+### Stage 1: Function Definition (DB 필터용)
 
 ```json
 {
-  "name": "search_jobs",
-  "description": "채용공고 데이터베이스에서 조건에 맞는 공고를 검색합니다. 조건이 없는 필드는 null로 두면 해당 조건 없이 검색합니다.",
+  "name": "filter_jobs",
+  "description": "명확한 조건으로 DB에서 후보 공고를 필터링합니다. 직무(job_type)는 이 함수에서 필터하지 않습니다.",
   "parameters": {
     "type": "object",
     "properties": {
-      "job_type": {
-        "type": "string",
-        "description": "정규화된 직무명 (예: 웹디자이너, 백엔드개발자, 프론트엔드개발자, 마케터, 영업, 기획자)"
-      },
-      "job_keywords": {
-        "type": "array",
-        "items": {"type": "string"},
-        "description": "직무 관련 키워드 (예: ['React', 'Node.js', 'AWS'])"
-      },
-      "job_category": {
-        "type": "string",
-        "enum": ["IT개발", "디자인", "마케팅", "영업", "경영지원", "생산제조", "서비스", "기타"],
-        "description": "직무 대분류"
-      },
       "preferred_locations": {
         "type": "array",
         "items": {"type": "string"},
-        "description": "선호 지역 리스트 (구/군 단위, 예: ['강남구', '서초구', '송파구'])"
+        "description": "선호 지역 리스트 (구/군 단위, 예: ['강남구', '서초구'])"
       },
       "user_location": {
         "type": "string",
-        "description": "사용자 거주/출발 위치 (동 단위, 예: '천호동', '강남역')"
+        "description": "사용자 출발 위치 (동 단위, 예: '천호동')"
       },
       "commute_time_minutes": {
         "type": "integer",
         "description": "최대 통근시간 (분 단위)"
+      },
+      "salary_min": {
+        "type": "integer",
+        "description": "최소 연봉 (만원 단위, 예: 5000 = 5천만원)"
       },
       "experience_type": {
         "type": "string",
         "enum": ["신입", "경력", "경력무관"],
         "description": "경력 조건"
       },
-      "experience_years_min": {
-        "type": "integer",
-        "description": "최소 경력 연차"
-      },
-      "experience_years_max": {
-        "type": "integer",
-        "description": "최대 경력 연차"
-      },
-      "salary_min": {
-        "type": "integer",
-        "description": "최소 연봉 (만원 단위, 예: 4000 = 4천만원)"
-      },
-      "salary_max": {
-        "type": "integer",
-        "description": "최대 연봉 (만원 단위)"
-      },
       "employment_type": {
         "type": "string",
-        "enum": ["정규직", "계약직", "인턴", "프리랜서", "아르바이트"],
+        "enum": ["정규직", "계약직", "인턴", "프리랜서"],
         "description": "고용형태"
-      },
-      "education": {
-        "type": "string",
-        "enum": ["학력무관", "고졸", "초대졸", "대졸", "석사", "박사"],
-        "description": "학력 조건"
-      },
-      "limit": {
-        "type": "integer",
-        "default": 10,
-        "description": "검색 결과 최대 개수 (기본값 10)"
       }
     },
     "required": []
@@ -507,36 +465,59 @@ jobchat/
 }
 ```
 
-### Function Calling 플로우
+### Stage 2: AI 선별 프롬프트
+
+```
+다음 후보 공고 목록에서 사용자 요청에 관련 있는 공고를 선별하세요.
+
+사용자 요청: "{job_query}" (예: "iOS 프론트 앱 개발자")
+
+후보 공고:
+1. [jk_123] iOS 개발자 채용
+2. [jk_456] 백엔드 개발자
+3. [jk_789] 모바일 앱 프론트엔드 개발자
+...
+
+관련 있는 공고의 ID만 배열로 반환하세요.
+응답 형식: ["jk_123", "jk_789", ...]
+```
+
+### 2-Stage 처리 플로우
 
 ```
 1. 사용자 입력 수신
    │
    ▼
-2. Gemini API 호출 (tools에 search_jobs 포함)
+2. Gemini: filter_jobs 파라미터 추출 + 직무 쿼리 추출
+   │  - filter_params: {locations, salary_min, ...}
+   │  - job_query: "iOS 프론트 앱 개발자"
    │
    ▼
-3. Gemini 응답 확인
-   ├─ function_call이 있는 경우:
-   │   │
-   │   ▼
-   │  4. search_jobs 파라미터 추출
-   │   │
-   │   ▼
-   │  5. Firestore 쿼리 실행
-   │   │
-   │   ▼
-   │  6. 검색 결과를 Gemini에 다시 전달
-   │      (function_response로 전달)
-   │   │
-   │   ▼
-   │  7. Gemini가 최종 응답 생성
+3. Stage 1: DB 필터링
+   │  - Firestore 쿼리 실행
+   │  - 후보 공고 목록 획득 (~300건)
    │
-   └─ function_call이 없는 경우:
-       │
-       ▼
-      일반 대화 응답 반환
+   ▼
+4. Stage 2: AI 선별
+   │  - 후보 목록을 Gemini에게 전달
+   │  - 관련 공고 ID 배열 수신
+   │
+   ▼
+5. 결과 조합 및 페이지네이션
+   │
+   ▼
+6. 최종 응답 생성 (친근한 소개)
 ```
+
+### 기존 대비 변경점
+
+| 항목 | 기존 | V2 |
+|------|------|-----|
+| 직무 필터링 | Function Calling (job_type) | AI 직접 판단 |
+| 키워드 반영 | 무시됨 | AI가 이해 |
+| mvp_category_map | 필요 (복잡한 매핑) | 불필요 |
+| 결과 수 | 10개 제한 | 전체 (페이지네이션) |
+| "기타" 문제 | 22%+ | 해결 |
 
 ---
 
@@ -713,87 +694,131 @@ class GeminiService:
 gemini_service = GeminiService()
 ```
 
-### backend/app/services/job_search.py
+### backend/app/services/job_search.py (V2 아키텍처)
 
 ```python
 from google.cloud import firestore
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from app.services.location import estimate_reachable_locations
 
 db = firestore.AsyncClient()
 
-async def search_jobs_in_db(params: Dict[str, Any]) -> List[Dict]:
+async def filter_jobs_by_conditions(params: Dict[str, Any]) -> List[Dict]:
     """
-    Firestore에서 채용공고 검색
+    Stage 1: DB에서 명확한 조건으로 후보 공고 필터링
+
+    NOTE: job_type, job_category는 필터하지 않음 (AI에게 위임)
     """
     query = db.collection("jobs").where("is_active", "==", True)
-    
-    # 직무 필터
-    if job_type := params.get("job_type"):
-        query = query.where("job_type", "==", job_type)
-    
-    # 직무 카테고리 필터
-    if job_category := params.get("job_category"):
-        query = query.where("job_category", "==", job_category)
-    
+
     # 위치 필터
     locations = params.get("preferred_locations", [])
-    
+
     # 통근시간 기반 위치 추정
     if user_location := params.get("user_location"):
         commute_time = params.get("commute_time_minutes", 60)
         estimated_locations = estimate_reachable_locations(user_location, commute_time)
         locations = list(set(locations + estimated_locations))
-    
+
     if locations:
         # Firestore는 in 쿼리가 최대 30개까지만 지원
         locations = locations[:30]
         query = query.where("location_gugun", "in", locations)
-    
+
     # 경력 필터
     if experience_type := params.get("experience_type"):
         if experience_type == "신입":
             query = query.where("experience_type", "in", ["신입", "경력무관"])
         elif experience_type == "경력":
             query = query.where("experience_type", "in", ["경력", "경력무관"])
-    
+
     # 고용형태 필터
     if employment_type := params.get("employment_type"):
         query = query.where("employment_type", "==", employment_type)
-    
-    # 결과 수 제한
-    limit = params.get("limit", 10)
-    query = query.limit(limit)
-    
+
+    # NOTE: limit 없이 전체 후보 가져옴 (AI 선별용)
     # 쿼리 실행
     docs = query.stream()
-    
-    results = []
+
+    candidates = []
     async for doc in docs:
         job = doc.to_dict()
-        
+
         # 연봉 필터 (클라이언트 사이드)
-        # Firestore는 복합 필터에 제한이 있어서 연봉은 후처리
         if salary_min := params.get("salary_min"):
             if job.get("salary_min") is None or job.get("salary_min") < salary_min:
                 continue
-        
-        results.append({
+
+        # AI 선별용 최소 정보만 포함
+        candidates.append({
             "id": job["id"],
-            "company_name": job["company_name"],
             "title": job["title"],
-            "location": job["location_full"],
-            "salary": job.get("salary_text", "협의"),
-            "experience": f"{job['experience_type']}" + (
-                f" {job.get('experience_min', 0)}년 이상" 
-                if job.get("experience_min") else ""
-            ),
-            "employment_type": job["employment_type"],
-            "deadline": job["deadline"],
-            "url": job["url"]
+            "company_name": job["company_name"],
+            "job_type_raw": job.get("job_type_raw", ""),
+            # 전체 데이터도 보관 (나중에 결과 조합 시 사용)
+            "_full_data": job
         })
-    
-    return results
+
+    return candidates
+
+
+async def get_jobs_by_ids(
+    candidates: List[Dict],
+    selected_ids: List[str],
+    page: int = 1,
+    page_size: int = 20
+) -> Dict[str, Any]:
+    """
+    Stage 3: AI가 선별한 ID 목록을 기반으로 결과 조합
+
+    Args:
+        candidates: Stage 1에서 가져온 후보 목록 (_full_data 포함)
+        selected_ids: Stage 2에서 AI가 선별한 ID 목록
+        page: 페이지 번호 (1부터 시작)
+        page_size: 페이지당 결과 수
+    """
+    # 선별된 ID로 필터링
+    id_set = set(selected_ids)
+    selected_jobs = [c for c in candidates if c["id"] in id_set]
+
+    # 페이지네이션 계산
+    total_count = len(selected_jobs)
+    total_pages = (total_count + page_size - 1) // page_size
+
+    start_idx = (page - 1) * page_size
+    end_idx = start_idx + page_size
+    page_jobs = selected_jobs[start_idx:end_idx]
+
+    # 응답 포맷팅
+    results = []
+    for job in page_jobs:
+        full = job["_full_data"]
+        results.append({
+            "id": full["id"],
+            "company_name": full["company_name"],
+            "title": full["title"],
+            "location": full.get("location_full", ""),
+            "salary": full.get("salary_text", "협의"),
+            "experience": f"{full.get('experience_type', '')}" + (
+                f" {full.get('experience_min', 0)}년 이상"
+                if full.get("experience_min") else ""
+            ),
+            "employment_type": full.get("employment_type", ""),
+            "deadline": full.get("deadline", ""),
+            "url": full["url"]
+        })
+
+    return {
+        "jobs": results,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        }
+    }
 ```
 
 ### backend/app/services/location.py

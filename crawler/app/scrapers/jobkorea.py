@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import httpx
 
 from app.config import settings
-from app.normalizers import normalize_job_type, get_job_category, normalize_location, parse_salary
+from app.normalizers import normalize_job_type, get_job_category, get_mvp_category, normalize_location, parse_salary
 
 
 # User-Agent 로테이션 풀
@@ -606,11 +606,13 @@ class JobKoreaScraper:
             primary_job_type = job_types[0] if job_types else ""
             normalized = normalize_job_type(primary_job_type) if primary_job_type else ""
             category = get_job_category(normalized) if normalized else "기타"
+            mvp_category = get_mvp_category(category)
 
             return {
                 "job_type": normalized or primary_job_type,
                 "job_type_raw": ", ".join(job_types[:3]),
                 "job_category": category,
+                "mvp_category": mvp_category,
                 "job_keywords": job_types[:5],
                 "industry": "",
                 "salary_text": salary_data["text"],
@@ -759,6 +761,7 @@ class JobKoreaScraper:
             "job_type": "",
             "job_type_raw": "",
             "job_category": "기타",
+            "mvp_category": "기타",
             "job_keywords": [],
             "location_sido": location_info.get("sido", "서울"),
             "location_gugun": location_info.get("gugun", ""),

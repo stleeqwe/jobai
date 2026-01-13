@@ -9,6 +9,7 @@ from app.routers import chat_router
 from app.db import init_firestore, check_connection
 from app.services.gemini import check_gemini
 from app.services.job_search import get_job_stats
+from app.services.maps import check_maps_api
 
 
 @asynccontextmanager
@@ -48,15 +49,16 @@ async def health_check():
     """
     헬스체크 엔드포인트
 
-    서비스 상태 및 외부 연결 확인
+    서비스 상태 및 외부 연결 확인 (V3: Maps API 추가)
     """
     return {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": "3.0.0",
         "environment": settings.ENVIRONMENT,
         "services": {
             "firestore": "connected" if check_connection() else "disconnected",
-            "gemini": "available" if check_gemini() else "unavailable"
+            "gemini": "available" if check_gemini() else "unavailable",
+            "maps_api": "available" if check_maps_api() else "unavailable"
         }
     }
 
@@ -89,3 +91,19 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
+
+
+@app.get("/geocode/reverse")
+async def reverse_geocode(lat: float, lng: float):
+    """
+    역지오코딩 엔드포인트
+
+    GPS 좌표를 주소로 변환합니다.
+    """
+    from app.services.maps import maps_service
+
+    if not maps_service.is_available():
+        return {"address": None, "error": "Maps API not available"}
+
+    address = await maps_service.reverse_geocode(lat, lng)
+    return {"address": address}
