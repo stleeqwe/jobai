@@ -9,7 +9,8 @@ from typing import Any, Dict, List, Optional
 
 from app.config import settings
 from app.services.job_search import get_all_active_jobs, filter_by_salary, format_job_results
-from app.services.maps import maps_service
+from app.services.subway import subway_service
+from app.db import save_conversation_history, load_conversation_history
 
 logger = logging.getLogger(__name__)
 
@@ -192,28 +193,6 @@ SELECT_JOBS_BY_TYPE_PROMPT = """
 
 
 # =============================================================================
-# 위치 파싱용 프롬프트 (Backend에서 별도 AI 호출)
-# =============================================================================
-PARSE_LOCATION_PROMPT = """
-다음 위치 표현에서 출발지 목록을 추출하세요.
-
-입력: "{location_query}"
-
-## 예시
-- "강남역" → ["강남역"]
-- "구의동이나 아차산로" → ["구의동", "아차산로"]
-- "판교나 강남쪽" → ["판교", "강남"]
-- "화양동 100번지" → ["화양동 100번지"]
-- "어린이대공원역" → ["어린이대공원역"]
-- "광진구" → ["광진구"]
-
-## 응답 형식
-JSON 배열만 응답하세요:
-["위치1", "위치2"]
-"""
-
-
-# =============================================================================
 # 직무 파싱용 프롬프트 (맥락 이해)
 # =============================================================================
 PARSE_JOB_TYPES_PROMPT = """
@@ -281,6 +260,8 @@ class GeminiService:
         )
         # 대화 히스토리 저장소
         self._conversations: Dict[str, List] = {}
+        # 검색 결과 캐시 (페이지네이션용)
+        self._search_cache: Dict[str, Dict[str, Any]] = {}
 
     async def process_message(
         self,
@@ -307,8 +288,16 @@ class GeminiService:
             응답 데이터
         """
         try:
-            # 대화 히스토리 복원
+            # 대화 히스토리 복원 (Firestore 우선, 없으면 인메모리)
             history = self._conversations.get(conversation_id, [])
+            if not history and conversation_id:
+                # Firestore에서 로드 시도
+                saved_data = await load_conversation_history(conversation_id)
+                if saved_data and saved_data.get("history"):
+                    logger.info(f"Firestore에서 대화 히스토리 로드: {conversation_id}")
+                    # 직렬화된 히스토리를 Gemini Content 형식으로 재구성
+                    history = self._reconstruct_history(saved_data["history"])
+
             chat = self.chat_model.start_chat(history=history)
 
             # 메시지 전송
@@ -364,6 +353,14 @@ class GeminiService:
 
                     final_jobs = result["jobs"]
 
+                    # 검색 결과 캐시 저장 (페이지네이션용)
+                    if conversation_id:
+                        self._search_cache[conversation_id] = {
+                            "jobs": final_jobs,
+                            "search_params": search_params,
+                            "response_text": ""  # 나중에 업데이트
+                        }
+
                     # 모든 function call에 대해 응답 생성 (다중 function call 오류 방지)
                     response_data = {
                         "total_count": len(final_jobs),
@@ -393,9 +390,17 @@ class GeminiService:
             # 최종 응답 텍스트 추출
             response_text = self._extract_text_response(response)
 
-            # 대화 히스토리 저장
+            # 대화 히스토리 저장 (인메모리 + Firestore)
             if conversation_id:
                 self._conversations[conversation_id] = chat.history
+                # Firestore에 비동기 저장 (실패해도 무시)
+                try:
+                    search_cache = self._search_cache.get(conversation_id)
+                    await save_conversation_history(
+                        conversation_id, chat.history, search_cache
+                    )
+                except Exception as e:
+                    logger.warning(f"대화 히스토리 Firestore 저장 실패: {e}")
 
             # 페이지네이션
             total_count = len(final_jobs)
@@ -496,38 +501,41 @@ class GeminiService:
         stage2_jobs = filter_by_salary(stage1_jobs, salary_min)
         logger.info(f"Stage 2 (연봉 필터): {len(stage2_jobs)}건")
 
-        # Stage 3: 거리 필터
+        # Stage 3: 거리 필터 (지하철 기반, AI 호출 없음)
         final_jobs = stage2_jobs
-        origins = []
+        origin = None
         location_filtered = False
         use_gps = False
 
-        if maps_service.is_available():
-            # GPS 좌표 사용 여부: AI가 판단한 use_current_location 플래그 사용
-            use_gps = user_coordinates and use_current_location
+        # GPS 좌표 사용 여부
+        use_gps = user_coordinates and use_current_location
 
-            if use_gps:
-                # GPS 좌표로 거리 필터
-                origin_str = f"{user_coordinates[0]},{user_coordinates[1]}"
-                logger.info(f"GPS 좌표 사용: {origin_str}")
-                stage3_jobs = await self._filter_by_distance(
-                    stage2_jobs, [origin_str], max_minutes, is_coordinates=True
-                )
-                logger.info(f"Stage 3 (GPS 거리 필터): {len(stage3_jobs)}건")
-                final_jobs = stage3_jobs
-                location_filtered = True
-                origins = ["내 위치 (GPS)"]
+        # 출발지 결정 (AI 호출 없이 그대로 전달)
+        if use_gps:
+            origin = f"{user_coordinates[0]},{user_coordinates[1]}"
+            logger.info(f"GPS 좌표 사용: {origin}")
+        elif location_query:
+            origin = location_query
+            logger.info(f"출발지: {origin}")
 
-            elif location_query:
-                # 텍스트 위치로 거리 필터
-                origins = await self._parse_location_query(location_query)
-                logger.info(f"파싱된 출발지: {origins}")
+        # 출발지가 있으면 거리 필터 실행
+        if origin and subway_service.is_available():
+            logger.info("Stage 3: 지하철 기반 거리 필터 사용")
 
-                if origins:
-                    stage3_jobs = await self._filter_by_distance(stage2_jobs, origins, max_minutes)
-                    logger.info(f"Stage 3 (거리 필터): {len(stage3_jobs)}건")
-                    final_jobs = stage3_jobs
-                    location_filtered = True
+            # SeoulSubwayCommute.filter_jobs()가 직접 location 파싱 처리
+            stage3_jobs = await subway_service.filter_jobs_by_travel_time(
+                stage2_jobs, origin, max_minutes
+            )
+
+            # 이동시간순 정렬
+            stage3_jobs.sort(key=lambda x: x.get("travel_time_minutes", 999))
+
+            final_jobs = stage3_jobs
+            location_filtered = True
+            logger.info(f"Stage 3 (지하철 거리 필터): {len(stage3_jobs)}건")
+
+        # GPS 사용시 출발지 표시
+        display_origin = "내 위치 (GPS)" if use_gps else origin
 
         # 샘플 공고 생성
         sample_jobs = self._make_sample_jobs(final_jobs[:5])
@@ -536,42 +544,10 @@ class GeminiService:
             "jobs": final_jobs,
             "sample_jobs": sample_jobs,
             "location_filtered": location_filtered,
-            "origins": origins,
+            "origin": display_origin,
             "used_gps": use_gps,
             "job_types_parsed": job_types
         }
-
-    async def _parse_location_query(self, location_query: str) -> List[str]:
-        """
-        위치 쿼리에서 출발지 목록 추출 (Backend AI 호출)
-
-        Args:
-            location_query: 사용자 위치 표현 원문
-
-        Returns:
-            출발지 목록
-        """
-        if not location_query:
-            return []
-
-        prompt = PARSE_LOCATION_PROMPT.format(location_query=location_query)
-
-        try:
-            response = self.filter_model.generate_content(prompt)
-            response_text = response.text.strip()
-
-            # JSON 배열 파싱
-            match = re.search(r'\[([^\]]*)\]', response_text, re.DOTALL)
-            if match:
-                array_str = "[" + match.group(1) + "]"
-                origins = json.loads(array_str)
-                return [o for o in origins if isinstance(o, str) and o.strip()]
-
-        except Exception as e:
-            logger.error(f"위치 파싱 오류: {e}")
-
-        # 파싱 실패 시 원문 그대로 사용
-        return [location_query]
 
     async def _parse_job_types(self, job_type_query: str) -> List[str]:
         """
@@ -610,98 +586,63 @@ class GeminiService:
         # 파싱 실패 시 원문 그대로 사용
         return [job_type_query]
 
-    async def _filter_by_distance(
-        self,
-        jobs: List[Dict],
-        origins: List[str],
-        max_minutes: int,
-        is_coordinates: bool = False
-    ) -> List[Dict]:
-        """
-        Stage 3: 거리 필터 (복수 출발지 지원)
-
-        Args:
-            jobs: Stage 2 결과
-            origins: 출발 위치 목록 (주소 또는 "lat,lng" 형식)
-            max_minutes: 최대 통근시간
-            is_coordinates: True면 origins가 GPS 좌표임
-
-        Returns:
-            거리 조건 충족 공고 목록
-        """
-        if not jobs or not origins:
-            return jobs
-
-        # 복수 출발지에서 하나라도 조건 충족하면 포함 (Union)
-        all_matching_jobs = {}
-
-        for origin in origins:
-            filtered = await maps_service.filter_jobs_by_travel_time(
-                jobs, origin, max_minutes
-            )
-            for job in filtered:
-                job_id = job.get("id")
-                if job_id not in all_matching_jobs:
-                    all_matching_jobs[job_id] = job
-                else:
-                    # 더 짧은 이동시간으로 업데이트
-                    existing_time = all_matching_jobs[job_id].get("travel_time_minutes", 999)
-                    new_time = job.get("travel_time_minutes", 999)
-                    if new_time < existing_time:
-                        all_matching_jobs[job_id] = job
-
-        # 이동시간순 정렬
-        result_jobs = sorted(
-            all_matching_jobs.values(),
-            key=lambda x: x.get("travel_time_minutes", 999)
-        )
-
-        return result_jobs
-
     async def _filter_by_job_type(
         self,
         job_type: str,
         jobs: List[Dict]
     ) -> List[Dict]:
-        """Stage 1: AI가 직무 유형으로 공고 필터링"""
+        """Stage 1: AI가 직무 유형으로 공고 필터링 (배치 처리 지원)"""
         if not job_type or not jobs:
             return jobs
 
-        # 후보 목록 포맷팅 (최대 500건)
-        candidate_lines = []
-        for c in jobs[:500]:
-            job_id = c.get("id", "")
-            title = c.get("title", "")[:50]
-            job_type_raw = c.get("job_type_raw", "")[:30]
-            candidate_lines.append(f'[{job_id}] {title} ({job_type_raw})')
+        # 배치 크기: 500건씩 처리
+        BATCH_SIZE = 500
+        all_selected_ids = []
 
-        candidates_text = "\n".join(candidate_lines)
+        # 배치 처리
+        for batch_start in range(0, len(jobs), BATCH_SIZE):
+            batch_jobs = jobs[batch_start:batch_start + BATCH_SIZE]
 
-        prompt = SELECT_JOBS_BY_TYPE_PROMPT.format(
-            job_type=job_type,
-            candidates=candidates_text
-        )
+            # 후보 목록 포맷팅
+            candidate_lines = []
+            for c in batch_jobs:
+                job_id = c.get("id", "")
+                title = c.get("title", "")[:50]
+                job_type_raw = c.get("job_type_raw", "")[:30]
+                candidate_lines.append(f'[{job_id}] {title} ({job_type_raw})')
 
-        try:
-            response = self.filter_model.generate_content(prompt)
-            response_text = response.text.strip()
+            candidates_text = "\n".join(candidate_lines)
 
-            # JSON 배열 파싱
-            selected_ids = self._parse_id_array(response_text)
+            prompt = SELECT_JOBS_BY_TYPE_PROMPT.format(
+                job_type=job_type,
+                candidates=candidates_text
+            )
 
-            # 선택된 ID로 필터링
-            id_to_job = {j["id"]: j for j in jobs}
-            selected_jobs = [
-                id_to_job[job_id]
-                for job_id in selected_ids
-                if job_id in id_to_job
-            ]
+            try:
+                response = self.filter_model.generate_content(prompt)
+                response_text = response.text.strip()
 
-            return selected_jobs
+                # JSON 배열 파싱
+                batch_selected_ids = self._parse_id_array(response_text)
+                all_selected_ids.extend(batch_selected_ids)
 
-        except Exception as e:
-            logger.error(f"Stage 1 직무 필터 오류: {e}")
-            return jobs
+                logger.info(f"배치 {batch_start//BATCH_SIZE + 1}: {len(batch_selected_ids)}건 선별")
+
+            except Exception as e:
+                logger.error(f"Stage 1 배치 {batch_start//BATCH_SIZE + 1} 오류: {e}")
+                # 오류 발생 시 해당 배치는 건너뜀
+
+        # 선택된 ID로 필터링
+        id_to_job = {j["id"]: j for j in jobs}
+        selected_jobs = [
+            id_to_job[job_id]
+            for job_id in all_selected_ids
+            if job_id in id_to_job
+        ]
+
+        logger.info(f"Stage 1 전체: {len(jobs)}건 중 {len(selected_jobs)}건 선별")
+
+        return selected_jobs
 
     def _make_sample_jobs(self, jobs: List[Dict]) -> List[Dict]:
         """AI에게 보여줄 샘플 공고 생성"""
@@ -736,7 +677,9 @@ class GeminiService:
         if match:
             try:
                 array_str = "[" + match.group(1) + "]"
-                return json.loads(array_str)
+                parsed = json.loads(array_str)
+                # 문자열만 추출 (dict 등 제외)
+                return [item for item in parsed if isinstance(item, str)]
             except json.JSONDecodeError:
                 pass
         ids = re.findall(r'["\']([jk_\d]+)["\']', text)
@@ -759,6 +702,98 @@ class GeminiService:
             "total_pages": 0,
             "has_next": False,
             "has_prev": False
+        }
+
+    def _reconstruct_history(self, serialized: List[Dict]) -> List:
+        """
+        직렬화된 히스토리를 Gemini Content 형식으로 재구성
+
+        Args:
+            serialized: 직렬화된 히스토리
+
+        Returns:
+            Gemini Content 객체 리스트
+        """
+        history = []
+        for item in serialized:
+            try:
+                role = item.get("role", "user")
+                parts_data = item.get("parts", [])
+
+                parts = []
+                for part_data in parts_data:
+                    part_type = part_data.get("type", "text")
+
+                    if part_type == "text":
+                        parts.append(genai.protos.Part(text=part_data.get("content", "")))
+                    elif part_type == "function_call":
+                        parts.append(genai.protos.Part(
+                            function_call=genai.protos.FunctionCall(
+                                name=part_data.get("name", ""),
+                                args=part_data.get("args", {})
+                            )
+                        ))
+                    elif part_type == "function_response":
+                        parts.append(genai.protos.Part(
+                            function_response=genai.protos.FunctionResponse(
+                                name=part_data.get("name", ""),
+                                response=part_data.get("response", {})
+                            )
+                        ))
+
+                if parts:
+                    history.append(genai.protos.Content(role=role, parts=parts))
+
+            except Exception as e:
+                logger.warning(f"히스토리 항목 재구성 실패: {e}")
+                continue
+
+        return history
+
+    def get_cached_page(
+        self,
+        conversation_id: str,
+        page: int = 1,
+        page_size: int = 20
+    ) -> Optional[Dict[str, Any]]:
+        """
+        캐시된 검색 결과에서 페이지 가져오기 (AI 재호출 없음)
+
+        Args:
+            conversation_id: 대화 ID
+            page: 페이지 번호
+            page_size: 페이지당 결과 수
+
+        Returns:
+            페이지 결과 또는 None (캐시 없음)
+        """
+        cache = self._search_cache.get(conversation_id)
+        if not cache:
+            return None
+
+        jobs = cache.get("jobs", [])
+        total_count = len(jobs)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        page = max(1, min(page, total_pages))
+
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_jobs = jobs[start_idx:end_idx]
+
+        formatted_jobs = format_job_results(page_jobs)
+
+        return {
+            "jobs": formatted_jobs,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            },
+            "search_params": cache.get("search_params", {}),
+            "success": True
         }
 
 

@@ -24,7 +24,8 @@ async def get_all_active_jobs() -> List[Dict]:
         return _get_dummy_jobs()
 
     try:
-        query = db.collection("jobs").where("is_active", "==", True).limit(1000)
+        # 서울 전체 크롤링 대응: 5000건으로 상향
+        query = db.collection("jobs").where("is_active", "==", True).limit(5000)
 
         jobs = []
         async for doc in query.stream():

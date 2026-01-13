@@ -1,0 +1,2010 @@
+[
+  {
+    "id": "line1_서울역",
+    "name": "서울역",
+    "line": 1,
+    "lat": 37.5547,
+    "lng": 126.9707,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_시청역",
+    "name": "시청역",
+    "line": 1,
+    "lat": 37.5657,
+    "lng": 126.977,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_종각역",
+    "name": "종각역",
+    "line": 1,
+    "lat": 37.5701,
+    "lng": 126.9822,
+    "is_transfer": false
+  },
+  {
+    "id": "line1_종로3가역",
+    "name": "종로3가역",
+    "line": 1,
+    "lat": 37.5713,
+    "lng": 126.9916,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_종로5가역",
+    "name": "종로5가역",
+    "line": 1,
+    "lat": 37.5707,
+    "lng": 127.0025,
+    "is_transfer": false
+  },
+  {
+    "id": "line1_동대문역",
+    "name": "동대문역",
+    "line": 1,
+    "lat": 37.571,
+    "lng": 127.0093,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_동묘앞역",
+    "name": "동묘앞역",
+    "line": 1,
+    "lat": 37.5717,
+    "lng": 127.0167,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_신설동역",
+    "name": "신설동역",
+    "line": 1,
+    "lat": 37.5761,
+    "lng": 127.0245,
+    "is_transfer": true
+  },
+  {
+    "id": "line1_제기동역",
+    "name": "제기동역",
+    "line": 1,
+    "lat": 37.5783,
+    "lng": 127.0388,
+    "is_transfer": false
+  },
+  {
+    "id": "line1_청량리역",
+    "name": "청량리역",
+    "line": 1,
+    "lat": 37.58,
+    "lng": 127.0477,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_시청역",
+    "name": "시청역",
+    "line": 2,
+    "lat": 37.5636,
+    "lng": 126.977,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_을지로입구역",
+    "name": "을지로입구역",
+    "line": 2,
+    "lat": 37.566,
+    "lng": 126.9824,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_을지로3가역",
+    "name": "을지로3가역",
+    "line": 2,
+    "lat": 37.5663,
+    "lng": 126.9918,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_을지로4가역",
+    "name": "을지로4가역",
+    "line": 2,
+    "lat": 37.5668,
+    "lng": 126.9982,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_동대문역사문화공원역",
+    "name": "동대문역사문화공원역",
+    "line": 2,
+    "lat": 37.5651,
+    "lng": 127.0074,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_신당역",
+    "name": "신당역",
+    "line": 2,
+    "lat": 37.5658,
+    "lng": 127.0175,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_상왕십리역",
+    "name": "상왕십리역",
+    "line": 2,
+    "lat": 37.5648,
+    "lng": 127.0292,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_왕십리역",
+    "name": "왕십리역",
+    "line": 2,
+    "lat": 37.5614,
+    "lng": 127.0378,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_한양대역",
+    "name": "한양대역",
+    "line": 2,
+    "lat": 37.5553,
+    "lng": 127.0434,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_뚝섬역",
+    "name": "뚝섬역",
+    "line": 2,
+    "lat": 37.5474,
+    "lng": 127.0473,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_성수역",
+    "name": "성수역",
+    "line": 2,
+    "lat": 37.5445,
+    "lng": 127.0559,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_건대입구역",
+    "name": "건대입구역",
+    "line": 2,
+    "lat": 37.5403,
+    "lng": 127.0694,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_구의역",
+    "name": "구의역",
+    "line": 2,
+    "lat": 37.5358,
+    "lng": 127.0865,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_강변역",
+    "name": "강변역",
+    "line": 2,
+    "lat": 37.5349,
+    "lng": 127.0946,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_잠실나루역",
+    "name": "잠실나루역",
+    "line": 2,
+    "lat": 37.5211,
+    "lng": 127.1028,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_잠실역",
+    "name": "잠실역",
+    "line": 2,
+    "lat": 37.5132,
+    "lng": 127.1001,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_잠실새내역",
+    "name": "잠실새내역",
+    "line": 2,
+    "lat": 37.5117,
+    "lng": 127.0865,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_종합운동장역",
+    "name": "종합운동장역",
+    "line": 2,
+    "lat": 37.5107,
+    "lng": 127.0739,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_삼성역",
+    "name": "삼성역",
+    "line": 2,
+    "lat": 37.5089,
+    "lng": 127.0637,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_선릉역",
+    "name": "선릉역",
+    "line": 2,
+    "lat": 37.5046,
+    "lng": 127.0492,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_역삼역",
+    "name": "역삼역",
+    "line": 2,
+    "lat": 37.5006,
+    "lng": 127.0365,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_강남역",
+    "name": "강남역",
+    "line": 2,
+    "lat": 37.4979,
+    "lng": 127.0276,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_교대역",
+    "name": "교대역",
+    "line": 2,
+    "lat": 37.4934,
+    "lng": 127.0145,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_서초역",
+    "name": "서초역",
+    "line": 2,
+    "lat": 37.4917,
+    "lng": 127.0078,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_방배역",
+    "name": "방배역",
+    "line": 2,
+    "lat": 37.4816,
+    "lng": 126.9976,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_사당역",
+    "name": "사당역",
+    "line": 2,
+    "lat": 37.4766,
+    "lng": 126.9817,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_낙성대역",
+    "name": "낙성대역",
+    "line": 2,
+    "lat": 37.4768,
+    "lng": 126.9636,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_서울대입구역",
+    "name": "서울대입구역",
+    "line": 2,
+    "lat": 37.4812,
+    "lng": 126.9528,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_봉천역",
+    "name": "봉천역",
+    "line": 2,
+    "lat": 37.4827,
+    "lng": 126.9417,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_신림역",
+    "name": "신림역",
+    "line": 2,
+    "lat": 37.4841,
+    "lng": 126.9296,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_신대방역",
+    "name": "신대방역",
+    "line": 2,
+    "lat": 37.4875,
+    "lng": 126.9132,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_구로디지털단지역",
+    "name": "구로디지털단지역",
+    "line": 2,
+    "lat": 37.4851,
+    "lng": 126.9014,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_대림역",
+    "name": "대림역",
+    "line": 2,
+    "lat": 37.4932,
+    "lng": 126.8958,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_신도림역",
+    "name": "신도림역",
+    "line": 2,
+    "lat": 37.5088,
+    "lng": 126.8912,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_문래역",
+    "name": "문래역",
+    "line": 2,
+    "lat": 37.5177,
+    "lng": 126.8955,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_영등포구청역",
+    "name": "영등포구청역",
+    "line": 2,
+    "lat": 37.5252,
+    "lng": 126.8965,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_당산역",
+    "name": "당산역",
+    "line": 2,
+    "lat": 37.5345,
+    "lng": 126.9025,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_합정역",
+    "name": "합정역",
+    "line": 2,
+    "lat": 37.5495,
+    "lng": 126.9138,
+    "is_transfer": true
+  },
+  {
+    "id": "line2_홍대입구역",
+    "name": "홍대입구역",
+    "line": 2,
+    "lat": 37.5573,
+    "lng": 126.9236,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_신촌역",
+    "name": "신촌역",
+    "line": 2,
+    "lat": 37.5553,
+    "lng": 126.9367,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_이대역",
+    "name": "이대역",
+    "line": 2,
+    "lat": 37.5568,
+    "lng": 126.9462,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_아현역",
+    "name": "아현역",
+    "line": 2,
+    "lat": 37.5575,
+    "lng": 126.9561,
+    "is_transfer": false
+  },
+  {
+    "id": "line2_충정로역",
+    "name": "충정로역",
+    "line": 2,
+    "lat": 37.56,
+    "lng": 126.9639,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_지축역",
+    "name": "지축역",
+    "line": 3,
+    "lat": 37.6483,
+    "lng": 126.9131,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_구파발역",
+    "name": "구파발역",
+    "line": 3,
+    "lat": 37.6368,
+    "lng": 126.9185,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_연신내역",
+    "name": "연신내역",
+    "line": 3,
+    "lat": 37.619,
+    "lng": 126.921,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_불광역",
+    "name": "불광역",
+    "line": 3,
+    "lat": 37.6101,
+    "lng": 126.9298,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_녹번역",
+    "name": "녹번역",
+    "line": 3,
+    "lat": 37.6009,
+    "lng": 126.9356,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_홍제역",
+    "name": "홍제역",
+    "line": 3,
+    "lat": 37.5889,
+    "lng": 126.9437,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_무악재역",
+    "name": "무악재역",
+    "line": 3,
+    "lat": 37.5822,
+    "lng": 126.95,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_독립문역",
+    "name": "독립문역",
+    "line": 3,
+    "lat": 37.5748,
+    "lng": 126.959,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_경복궁역",
+    "name": "경복궁역",
+    "line": 3,
+    "lat": 37.5759,
+    "lng": 126.9738,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_안국역",
+    "name": "안국역",
+    "line": 3,
+    "lat": 37.5763,
+    "lng": 126.9851,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_종로3가역",
+    "name": "종로3가역",
+    "line": 3,
+    "lat": 37.5713,
+    "lng": 126.9916,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_을지로3가역",
+    "name": "을지로3가역",
+    "line": 3,
+    "lat": 37.5663,
+    "lng": 126.9918,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_충무로역",
+    "name": "충무로역",
+    "line": 3,
+    "lat": 37.5614,
+    "lng": 126.9942,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_동대입구역",
+    "name": "동대입구역",
+    "line": 3,
+    "lat": 37.5575,
+    "lng": 126.9897,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_약수역",
+    "name": "약수역",
+    "line": 3,
+    "lat": 37.5549,
+    "lng": 127.0102,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_금호역",
+    "name": "금호역",
+    "line": 3,
+    "lat": 37.5476,
+    "lng": 127.0175,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_옥수역",
+    "name": "옥수역",
+    "line": 3,
+    "lat": 37.5404,
+    "lng": 127.0178,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_압구정역",
+    "name": "압구정역",
+    "line": 3,
+    "lat": 37.5271,
+    "lng": 127.0282,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_신사역",
+    "name": "신사역",
+    "line": 3,
+    "lat": 37.5166,
+    "lng": 127.0203,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_잠원역",
+    "name": "잠원역",
+    "line": 3,
+    "lat": 37.5118,
+    "lng": 127.0136,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_고속터미널역",
+    "name": "고속터미널역",
+    "line": 3,
+    "lat": 37.505,
+    "lng": 127.0049,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_교대역",
+    "name": "교대역",
+    "line": 3,
+    "lat": 37.4934,
+    "lng": 127.0145,
+    "is_transfer": true
+  },
+  {
+    "id": "line3_남부터미널역",
+    "name": "남부터미널역",
+    "line": 3,
+    "lat": 37.4847,
+    "lng": 127.0166,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_양재역",
+    "name": "양재역",
+    "line": 3,
+    "lat": 37.4841,
+    "lng": 127.0343,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_매봉역",
+    "name": "매봉역",
+    "line": 3,
+    "lat": 37.4871,
+    "lng": 127.0466,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_도곡역",
+    "name": "도곡역",
+    "line": 3,
+    "lat": 37.4908,
+    "lng": 127.0556,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_대치역",
+    "name": "대치역",
+    "line": 3,
+    "lat": 37.4944,
+    "lng": 127.0628,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_학여울역",
+    "name": "학여울역",
+    "line": 3,
+    "lat": 37.4965,
+    "lng": 127.0715,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_대청역",
+    "name": "대청역",
+    "line": 3,
+    "lat": 37.4926,
+    "lng": 127.0833,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_일원역",
+    "name": "일원역",
+    "line": 3,
+    "lat": 37.483,
+    "lng": 127.0864,
+    "is_transfer": false
+  },
+  {
+    "id": "line3_수서역",
+    "name": "수서역",
+    "line": 3,
+    "lat": 37.4875,
+    "lng": 127.1019,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_당고개역",
+    "name": "당고개역",
+    "line": 4,
+    "lat": 37.6702,
+    "lng": 127.0793,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_상계역",
+    "name": "상계역",
+    "line": 4,
+    "lat": 37.6625,
+    "lng": 127.0731,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_노원역",
+    "name": "노원역",
+    "line": 4,
+    "lat": 37.6557,
+    "lng": 127.0627,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_창동역",
+    "name": "창동역",
+    "line": 4,
+    "lat": 37.653,
+    "lng": 127.0476,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_쌍문역",
+    "name": "쌍문역",
+    "line": 4,
+    "lat": 37.6484,
+    "lng": 127.0348,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_수유역",
+    "name": "수유역",
+    "line": 4,
+    "lat": 37.6381,
+    "lng": 127.0252,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_미아역",
+    "name": "미아역",
+    "line": 4,
+    "lat": 37.6262,
+    "lng": 127.026,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_미아사거리역",
+    "name": "미아사거리역",
+    "line": 4,
+    "lat": 37.6133,
+    "lng": 127.0301,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_길음역",
+    "name": "길음역",
+    "line": 4,
+    "lat": 37.6032,
+    "lng": 127.025,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_성신여대입구역",
+    "name": "성신여대입구역",
+    "line": 4,
+    "lat": 37.5927,
+    "lng": 127.0165,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_한성대입구역",
+    "name": "한성대입구역",
+    "line": 4,
+    "lat": 37.5884,
+    "lng": 127.0067,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_혜화역",
+    "name": "혜화역",
+    "line": 4,
+    "lat": 37.5825,
+    "lng": 127.0017,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_동대문역",
+    "name": "동대문역",
+    "line": 4,
+    "lat": 37.571,
+    "lng": 127.0093,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_동대문역사문화공원역",
+    "name": "동대문역사문화공원역",
+    "line": 4,
+    "lat": 37.5651,
+    "lng": 127.0074,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_충무로역",
+    "name": "충무로역",
+    "line": 4,
+    "lat": 37.5614,
+    "lng": 126.9942,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_명동역",
+    "name": "명동역",
+    "line": 4,
+    "lat": 37.5609,
+    "lng": 126.9858,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_회현역",
+    "name": "회현역",
+    "line": 4,
+    "lat": 37.5584,
+    "lng": 126.9782,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_서울역",
+    "name": "서울역",
+    "line": 4,
+    "lat": 37.5547,
+    "lng": 126.9707,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_숙대입구역",
+    "name": "숙대입구역",
+    "line": 4,
+    "lat": 37.5448,
+    "lng": 126.972,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_삼각지역",
+    "name": "삼각지역",
+    "line": 4,
+    "lat": 37.5346,
+    "lng": 126.973,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_신용산역",
+    "name": "신용산역",
+    "line": 4,
+    "lat": 37.5295,
+    "lng": 126.9685,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_이촌역",
+    "name": "이촌역",
+    "line": 4,
+    "lat": 37.5225,
+    "lng": 126.9711,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_동작역",
+    "name": "동작역",
+    "line": 4,
+    "lat": 37.5069,
+    "lng": 126.9813,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_총신대입구역",
+    "name": "총신대입구역",
+    "line": 4,
+    "lat": 37.4866,
+    "lng": 126.9825,
+    "is_transfer": false
+  },
+  {
+    "id": "line4_사당역",
+    "name": "사당역",
+    "line": 4,
+    "lat": 37.4766,
+    "lng": 126.9817,
+    "is_transfer": true
+  },
+  {
+    "id": "line4_남태령역",
+    "name": "남태령역",
+    "line": 4,
+    "lat": 37.4647,
+    "lng": 126.9881,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_방화역",
+    "name": "방화역",
+    "line": 5,
+    "lat": 37.5757,
+    "lng": 126.8152,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_개화산역",
+    "name": "개화산역",
+    "line": 5,
+    "lat": 37.5726,
+    "lng": 126.8012,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_김포공항역",
+    "name": "김포공항역",
+    "line": 5,
+    "lat": 37.5621,
+    "lng": 126.8011,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_송정역",
+    "name": "송정역",
+    "line": 5,
+    "lat": 37.5552,
+    "lng": 126.8101,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_마곡역",
+    "name": "마곡역",
+    "line": 5,
+    "lat": 37.5599,
+    "lng": 126.8243,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_발산역",
+    "name": "발산역",
+    "line": 5,
+    "lat": 37.5584,
+    "lng": 126.8377,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_우장산역",
+    "name": "우장산역",
+    "line": 5,
+    "lat": 37.5484,
+    "lng": 126.8357,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_화곡역",
+    "name": "화곡역",
+    "line": 5,
+    "lat": 37.5418,
+    "lng": 126.8396,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_까치산역",
+    "name": "까치산역",
+    "line": 5,
+    "lat": 37.5316,
+    "lng": 126.8474,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_신정역",
+    "name": "신정역",
+    "line": 5,
+    "lat": 37.5248,
+    "lng": 126.8562,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_목동역",
+    "name": "목동역",
+    "line": 5,
+    "lat": 37.5271,
+    "lng": 126.8671,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_오목교역",
+    "name": "오목교역",
+    "line": 5,
+    "lat": 37.5242,
+    "lng": 126.8755,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_양평역",
+    "name": "양평역",
+    "line": 5,
+    "lat": 37.5252,
+    "lng": 126.8845,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_영등포구청역",
+    "name": "영등포구청역",
+    "line": 5,
+    "lat": 37.5252,
+    "lng": 126.8965,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_영등포시장역",
+    "name": "영등포시장역",
+    "line": 5,
+    "lat": 37.5226,
+    "lng": 126.9055,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_신길역",
+    "name": "신길역",
+    "line": 5,
+    "lat": 37.5177,
+    "lng": 126.9159,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_여의도역",
+    "name": "여의도역",
+    "line": 5,
+    "lat": 37.5219,
+    "lng": 126.9243,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_여의나루역",
+    "name": "여의나루역",
+    "line": 5,
+    "lat": 37.5272,
+    "lng": 126.9329,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_마포역",
+    "name": "마포역",
+    "line": 5,
+    "lat": 37.5395,
+    "lng": 126.946,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_공덕역",
+    "name": "공덕역",
+    "line": 5,
+    "lat": 37.5441,
+    "lng": 126.9515,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_애오개역",
+    "name": "애오개역",
+    "line": 5,
+    "lat": 37.553,
+    "lng": 126.9567,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_충정로역",
+    "name": "충정로역",
+    "line": 5,
+    "lat": 37.56,
+    "lng": 126.9639,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_서대문역",
+    "name": "서대문역",
+    "line": 5,
+    "lat": 37.5651,
+    "lng": 126.9666,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_광화문역",
+    "name": "광화문역",
+    "line": 5,
+    "lat": 37.5713,
+    "lng": 126.9768,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_종로3가역",
+    "name": "종로3가역",
+    "line": 5,
+    "lat": 37.5713,
+    "lng": 126.9916,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_을지로4가역",
+    "name": "을지로4가역",
+    "line": 5,
+    "lat": 37.5668,
+    "lng": 126.9982,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_동대문역사문화공원역",
+    "name": "동대문역사문화공원역",
+    "line": 5,
+    "lat": 37.5651,
+    "lng": 127.0074,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_청구역",
+    "name": "청구역",
+    "line": 5,
+    "lat": 37.5601,
+    "lng": 127.0141,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_신금호역",
+    "name": "신금호역",
+    "line": 5,
+    "lat": 37.5546,
+    "lng": 127.0214,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_행당역",
+    "name": "행당역",
+    "line": 5,
+    "lat": 37.5573,
+    "lng": 127.0322,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_왕십리역",
+    "name": "왕십리역",
+    "line": 5,
+    "lat": 37.5614,
+    "lng": 127.0378,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_마장역",
+    "name": "마장역",
+    "line": 5,
+    "lat": 37.566,
+    "lng": 127.0464,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_답십리역",
+    "name": "답십리역",
+    "line": 5,
+    "lat": 37.5676,
+    "lng": 127.0528,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_장한평역",
+    "name": "장한평역",
+    "line": 5,
+    "lat": 37.5615,
+    "lng": 127.0643,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_군자역",
+    "name": "군자역",
+    "line": 5,
+    "lat": 37.5575,
+    "lng": 127.0794,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_아차산역",
+    "name": "아차산역",
+    "line": 5,
+    "lat": 37.5507,
+    "lng": 127.0883,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_광나루역",
+    "name": "광나루역",
+    "line": 5,
+    "lat": 37.5445,
+    "lng": 127.1035,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_천호역",
+    "name": "천호역",
+    "line": 5,
+    "lat": 37.5389,
+    "lng": 127.1235,
+    "is_transfer": true
+  },
+  {
+    "id": "line5_강동역",
+    "name": "강동역",
+    "line": 5,
+    "lat": 37.5352,
+    "lng": 127.1324,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_길동역",
+    "name": "길동역",
+    "line": 5,
+    "lat": 37.5337,
+    "lng": 127.1439,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_굽은다리역",
+    "name": "굽은다리역",
+    "line": 5,
+    "lat": 37.5339,
+    "lng": 127.1538,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_명일역",
+    "name": "명일역",
+    "line": 5,
+    "lat": 37.5281,
+    "lng": 127.1638,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_고덕역",
+    "name": "고덕역",
+    "line": 5,
+    "lat": 37.5548,
+    "lng": 127.1545,
+    "is_transfer": false
+  },
+  {
+    "id": "line5_상일동역",
+    "name": "상일동역",
+    "line": 5,
+    "lat": 37.5573,
+    "lng": 127.1673,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_응암역",
+    "name": "응암역",
+    "line": 6,
+    "lat": 37.5984,
+    "lng": 126.913,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_역촌역",
+    "name": "역촌역",
+    "line": 6,
+    "lat": 37.6055,
+    "lng": 126.9225,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_불광역",
+    "name": "불광역",
+    "line": 6,
+    "lat": 37.6101,
+    "lng": 126.9298,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_독바위역",
+    "name": "독바위역",
+    "line": 6,
+    "lat": 37.6131,
+    "lng": 126.938,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_연신내역",
+    "name": "연신내역",
+    "line": 6,
+    "lat": 37.619,
+    "lng": 126.921,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_구산역",
+    "name": "구산역",
+    "line": 6,
+    "lat": 37.612,
+    "lng": 126.9031,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_새절역",
+    "name": "새절역",
+    "line": 6,
+    "lat": 37.5994,
+    "lng": 126.91,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_증산역",
+    "name": "증산역",
+    "line": 6,
+    "lat": 37.5848,
+    "lng": 126.9097,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_디지털미디어시티역",
+    "name": "디지털미디어시티역",
+    "line": 6,
+    "lat": 37.5771,
+    "lng": 126.8999,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_월드컵경기장역",
+    "name": "월드컵경기장역",
+    "line": 6,
+    "lat": 37.5682,
+    "lng": 126.8972,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_마포구청역",
+    "name": "마포구청역",
+    "line": 6,
+    "lat": 37.562,
+    "lng": 126.9039,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_망원역",
+    "name": "망원역",
+    "line": 6,
+    "lat": 37.5564,
+    "lng": 126.9102,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_합정역",
+    "name": "합정역",
+    "line": 6,
+    "lat": 37.5495,
+    "lng": 126.9138,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_상수역",
+    "name": "상수역",
+    "line": 6,
+    "lat": 37.5477,
+    "lng": 126.9227,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_광흥창역",
+    "name": "광흥창역",
+    "line": 6,
+    "lat": 37.5476,
+    "lng": 126.9316,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_대흥역",
+    "name": "대흥역",
+    "line": 6,
+    "lat": 37.5477,
+    "lng": 126.9419,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_공덕역",
+    "name": "공덕역",
+    "line": 6,
+    "lat": 37.5441,
+    "lng": 126.9515,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_효창공원앞역",
+    "name": "효창공원앞역",
+    "line": 6,
+    "lat": 37.5394,
+    "lng": 126.9614,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_삼각지역",
+    "name": "삼각지역",
+    "line": 6,
+    "lat": 37.5346,
+    "lng": 126.973,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_녹사평역",
+    "name": "녹사평역",
+    "line": 6,
+    "lat": 37.534,
+    "lng": 126.9872,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_이태원역",
+    "name": "이태원역",
+    "line": 6,
+    "lat": 37.5345,
+    "lng": 126.9944,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_한강진역",
+    "name": "한강진역",
+    "line": 6,
+    "lat": 37.5395,
+    "lng": 127.0017,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_버티고개역",
+    "name": "버티고개역",
+    "line": 6,
+    "lat": 37.5476,
+    "lng": 127.0069,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_약수역",
+    "name": "약수역",
+    "line": 6,
+    "lat": 37.5549,
+    "lng": 127.0102,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_청구역",
+    "name": "청구역",
+    "line": 6,
+    "lat": 37.5601,
+    "lng": 127.0141,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_신당역",
+    "name": "신당역",
+    "line": 6,
+    "lat": 37.5658,
+    "lng": 127.0175,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_동묘앞역",
+    "name": "동묘앞역",
+    "line": 6,
+    "lat": 37.5717,
+    "lng": 127.0167,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_창신역",
+    "name": "창신역",
+    "line": 6,
+    "lat": 37.5795,
+    "lng": 127.0152,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_보문역",
+    "name": "보문역",
+    "line": 6,
+    "lat": 37.5852,
+    "lng": 127.0196,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_안암역",
+    "name": "안암역",
+    "line": 6,
+    "lat": 37.5863,
+    "lng": 127.0284,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_고려대역",
+    "name": "고려대역",
+    "line": 6,
+    "lat": 37.5897,
+    "lng": 127.0342,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_월곡역",
+    "name": "월곡역",
+    "line": 6,
+    "lat": 37.6003,
+    "lng": 127.0403,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_상월곡역",
+    "name": "상월곡역",
+    "line": 6,
+    "lat": 37.6066,
+    "lng": 127.0481,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_돌곶이역",
+    "name": "돌곶이역",
+    "line": 6,
+    "lat": 37.6103,
+    "lng": 127.0564,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_석계역",
+    "name": "석계역",
+    "line": 6,
+    "lat": 37.615,
+    "lng": 127.0661,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_태릉입구역",
+    "name": "태릉입구역",
+    "line": 6,
+    "lat": 37.618,
+    "lng": 127.0751,
+    "is_transfer": true
+  },
+  {
+    "id": "line6_화랑대역",
+    "name": "화랑대역",
+    "line": 6,
+    "lat": 37.6199,
+    "lng": 127.0841,
+    "is_transfer": false
+  },
+  {
+    "id": "line6_봉화산역",
+    "name": "봉화산역",
+    "line": 6,
+    "lat": 37.6173,
+    "lng": 127.0915,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_장암역",
+    "name": "장암역",
+    "line": 7,
+    "lat": 37.6997,
+    "lng": 127.0531,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_도봉산역",
+    "name": "도봉산역",
+    "line": 7,
+    "lat": 37.689,
+    "lng": 127.0446,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_수락산역",
+    "name": "수락산역",
+    "line": 7,
+    "lat": 37.6762,
+    "lng": 127.0559,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_마들역",
+    "name": "마들역",
+    "line": 7,
+    "lat": 37.6647,
+    "lng": 127.0578,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_노원역",
+    "name": "노원역",
+    "line": 7,
+    "lat": 37.6557,
+    "lng": 127.0627,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_중계역",
+    "name": "중계역",
+    "line": 7,
+    "lat": 37.6455,
+    "lng": 127.0639,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_하계역",
+    "name": "하계역",
+    "line": 7,
+    "lat": 37.6376,
+    "lng": 127.0666,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_공릉역",
+    "name": "공릉역",
+    "line": 7,
+    "lat": 37.6257,
+    "lng": 127.0727,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_태릉입구역",
+    "name": "태릉입구역",
+    "line": 7,
+    "lat": 37.618,
+    "lng": 127.0751,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_먹골역",
+    "name": "먹골역",
+    "line": 7,
+    "lat": 37.6108,
+    "lng": 127.0781,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_중화역",
+    "name": "중화역",
+    "line": 7,
+    "lat": 37.6026,
+    "lng": 127.0804,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_상봉역",
+    "name": "상봉역",
+    "line": 7,
+    "lat": 37.5965,
+    "lng": 127.0851,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_면목역",
+    "name": "면목역",
+    "line": 7,
+    "lat": 37.5885,
+    "lng": 127.0877,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_사가정역",
+    "name": "사가정역",
+    "line": 7,
+    "lat": 37.5808,
+    "lng": 127.0901,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_용마산역",
+    "name": "용마산역",
+    "line": 7,
+    "lat": 37.5735,
+    "lng": 127.0869,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_중곡역",
+    "name": "중곡역",
+    "line": 7,
+    "lat": 37.5657,
+    "lng": 127.0843,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_군자역",
+    "name": "군자역",
+    "line": 7,
+    "lat": 37.5575,
+    "lng": 127.0794,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_어린이대공원역",
+    "name": "어린이대공원역",
+    "line": 7,
+    "lat": 37.5481,
+    "lng": 127.0742,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_건대입구역",
+    "name": "건대입구역",
+    "line": 7,
+    "lat": 37.5403,
+    "lng": 127.0694,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_뚝섬유원지역",
+    "name": "뚝섬유원지역",
+    "line": 7,
+    "lat": 37.5313,
+    "lng": 127.0667,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_청담역",
+    "name": "청담역",
+    "line": 7,
+    "lat": 37.5199,
+    "lng": 127.0539,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_강남구청역",
+    "name": "강남구청역",
+    "line": 7,
+    "lat": 37.5172,
+    "lng": 127.0413,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_학동역",
+    "name": "학동역",
+    "line": 7,
+    "lat": 37.5147,
+    "lng": 127.0321,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_논현역",
+    "name": "논현역",
+    "line": 7,
+    "lat": 37.5112,
+    "lng": 127.0221,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_반포역",
+    "name": "반포역",
+    "line": 7,
+    "lat": 37.508,
+    "lng": 127.0114,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_고속터미널역",
+    "name": "고속터미널역",
+    "line": 7,
+    "lat": 37.505,
+    "lng": 127.0049,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_내방역",
+    "name": "내방역",
+    "line": 7,
+    "lat": 37.488,
+    "lng": 126.9976,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_이수역",
+    "name": "이수역",
+    "line": 7,
+    "lat": 37.4858,
+    "lng": 126.9821,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_남성역",
+    "name": "남성역",
+    "line": 7,
+    "lat": 37.4836,
+    "lng": 126.9735,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_숭실대입구역",
+    "name": "숭실대입구역",
+    "line": 7,
+    "lat": 37.4964,
+    "lng": 126.9536,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_상도역",
+    "name": "상도역",
+    "line": 7,
+    "lat": 37.5026,
+    "lng": 126.9426,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_장승배기역",
+    "name": "장승배기역",
+    "line": 7,
+    "lat": 37.5052,
+    "lng": 126.9367,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_신대방삼거리역",
+    "name": "신대방삼거리역",
+    "line": 7,
+    "lat": 37.4987,
+    "lng": 126.9256,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_보라매역",
+    "name": "보라매역",
+    "line": 7,
+    "lat": 37.4996,
+    "lng": 126.9188,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_신풍역",
+    "name": "신풍역",
+    "line": 7,
+    "lat": 37.5028,
+    "lng": 126.9097,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_대림역",
+    "name": "대림역",
+    "line": 7,
+    "lat": 37.4932,
+    "lng": 126.8958,
+    "is_transfer": true
+  },
+  {
+    "id": "line7_남구로역",
+    "name": "남구로역",
+    "line": 7,
+    "lat": 37.4865,
+    "lng": 126.8872,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_가산디지털단지역",
+    "name": "가산디지털단지역",
+    "line": 7,
+    "lat": 37.4816,
+    "lng": 126.8827,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_철산역",
+    "name": "철산역",
+    "line": 7,
+    "lat": 37.4771,
+    "lng": 126.8682,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_광명사거리역",
+    "name": "광명사거리역",
+    "line": 7,
+    "lat": 37.4787,
+    "lng": 126.8549,
+    "is_transfer": false
+  },
+  {
+    "id": "line7_천왕역",
+    "name": "천왕역",
+    "line": 7,
+    "lat": 37.4846,
+    "lng": 126.8452,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_암사역",
+    "name": "암사역",
+    "line": 8,
+    "lat": 37.5504,
+    "lng": 127.1271,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_천호역",
+    "name": "천호역",
+    "line": 8,
+    "lat": 37.5389,
+    "lng": 127.1235,
+    "is_transfer": true
+  },
+  {
+    "id": "line8_강동구청역",
+    "name": "강동구청역",
+    "line": 8,
+    "lat": 37.53,
+    "lng": 127.1265,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_몽촌토성역",
+    "name": "몽촌토성역",
+    "line": 8,
+    "lat": 37.5172,
+    "lng": 127.1124,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_잠실역",
+    "name": "잠실역",
+    "line": 8,
+    "lat": 37.5132,
+    "lng": 127.1001,
+    "is_transfer": true
+  },
+  {
+    "id": "line8_석촌역",
+    "name": "석촌역",
+    "line": 8,
+    "lat": 37.5053,
+    "lng": 127.1019,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_송파역",
+    "name": "송파역",
+    "line": 8,
+    "lat": 37.5009,
+    "lng": 127.1083,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_가락시장역",
+    "name": "가락시장역",
+    "line": 8,
+    "lat": 37.4926,
+    "lng": 127.1181,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_문정역",
+    "name": "문정역",
+    "line": 8,
+    "lat": 37.4858,
+    "lng": 127.1226,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_장지역",
+    "name": "장지역",
+    "line": 8,
+    "lat": 37.4782,
+    "lng": 127.1258,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_복정역",
+    "name": "복정역",
+    "line": 8,
+    "lat": 37.4701,
+    "lng": 127.1265,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_남위례역",
+    "name": "남위례역",
+    "line": 8,
+    "lat": 37.4631,
+    "lng": 127.1439,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_산성역",
+    "name": "산성역",
+    "line": 8,
+    "lat": 37.4571,
+    "lng": 127.1513,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_남한산성입구역",
+    "name": "남한산성입구역",
+    "line": 8,
+    "lat": 37.452,
+    "lng": 127.1569,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_단대오거리역",
+    "name": "단대오거리역",
+    "line": 8,
+    "lat": 37.4451,
+    "lng": 127.1567,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_신흥역",
+    "name": "신흥역",
+    "line": 8,
+    "lat": 37.4377,
+    "lng": 127.1542,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_수진역",
+    "name": "수진역",
+    "line": 8,
+    "lat": 37.4319,
+    "lng": 127.1556,
+    "is_transfer": false
+  },
+  {
+    "id": "line8_모란역",
+    "name": "모란역",
+    "line": 8,
+    "lat": 37.4318,
+    "lng": 127.1293,
+    "is_transfer": false
+  }
+]

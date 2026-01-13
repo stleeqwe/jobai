@@ -89,6 +89,33 @@ class ChatResponse(BaseModel):
         return self.pagination.total_count
 
 
+class LoadMoreRequest(BaseModel):
+    """더 보기 요청 모델 (캐시 기반 페이지네이션)"""
+    conversation_id: str = Field(
+        ...,
+        description="대화 ID"
+    )
+    page: int = Field(
+        default=1,
+        ge=1,
+        description="페이지 번호"
+    )
+    page_size: int = Field(
+        default=20,
+        ge=1,
+        le=100,
+        description="페이지당 결과 수"
+    )
+
+
+class LoadMoreResponse(BaseModel):
+    """더 보기 응답 모델"""
+    success: bool
+    jobs: list[JobItem]
+    pagination: PaginationInfo
+    search_params: dict[str, Any] = Field(default_factory=dict)
+
+
 class HealthResponse(BaseModel):
     """헬스체크 응답"""
     status: str

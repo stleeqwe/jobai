@@ -1,0 +1,1710 @@
+[
+  {
+    "from": "line1_서울역",
+    "to": "line1_시청역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_시청역",
+    "to": "line1_종각역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_종각역",
+    "to": "line1_종로3가역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_종로3가역",
+    "to": "line1_종로5가역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_종로5가역",
+    "to": "line1_동대문역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_동대문역",
+    "to": "line1_동묘앞역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_동묘앞역",
+    "to": "line1_신설동역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_신설동역",
+    "to": "line1_제기동역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line1_제기동역",
+    "to": "line1_청량리역",
+    "line": 1,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_시청역",
+    "to": "line2_을지로입구역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_을지로입구역",
+    "to": "line2_을지로3가역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_을지로3가역",
+    "to": "line2_을지로4가역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_을지로4가역",
+    "to": "line2_동대문역사문화공원역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_동대문역사문화공원역",
+    "to": "line2_신당역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_신당역",
+    "to": "line2_상왕십리역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_상왕십리역",
+    "to": "line2_왕십리역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_왕십리역",
+    "to": "line2_한양대역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_한양대역",
+    "to": "line2_뚝섬역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_뚝섬역",
+    "to": "line2_성수역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_성수역",
+    "to": "line2_건대입구역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_건대입구역",
+    "to": "line2_구의역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_구의역",
+    "to": "line2_강변역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_강변역",
+    "to": "line2_잠실나루역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_잠실나루역",
+    "to": "line2_잠실역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_잠실역",
+    "to": "line2_잠실새내역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_잠실새내역",
+    "to": "line2_종합운동장역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_종합운동장역",
+    "to": "line2_삼성역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_삼성역",
+    "to": "line2_선릉역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_선릉역",
+    "to": "line2_역삼역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_역삼역",
+    "to": "line2_강남역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_강남역",
+    "to": "line2_교대역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_교대역",
+    "to": "line2_서초역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_서초역",
+    "to": "line2_방배역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_방배역",
+    "to": "line2_사당역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_사당역",
+    "to": "line2_낙성대역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_낙성대역",
+    "to": "line2_서울대입구역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_서울대입구역",
+    "to": "line2_봉천역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_봉천역",
+    "to": "line2_신림역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_신림역",
+    "to": "line2_신대방역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_신대방역",
+    "to": "line2_구로디지털단지역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_구로디지털단지역",
+    "to": "line2_대림역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_대림역",
+    "to": "line2_신도림역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_신도림역",
+    "to": "line2_문래역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_문래역",
+    "to": "line2_영등포구청역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_영등포구청역",
+    "to": "line2_당산역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_당산역",
+    "to": "line2_합정역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_합정역",
+    "to": "line2_홍대입구역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_홍대입구역",
+    "to": "line2_신촌역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_신촌역",
+    "to": "line2_이대역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_이대역",
+    "to": "line2_아현역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_아현역",
+    "to": "line2_충정로역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line2_충정로역",
+    "to": "line2_시청역",
+    "line": 2,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_지축역",
+    "to": "line3_구파발역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_구파발역",
+    "to": "line3_연신내역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_연신내역",
+    "to": "line3_불광역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_불광역",
+    "to": "line3_녹번역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_녹번역",
+    "to": "line3_홍제역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_홍제역",
+    "to": "line3_무악재역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_무악재역",
+    "to": "line3_독립문역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_독립문역",
+    "to": "line3_경복궁역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_경복궁역",
+    "to": "line3_안국역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_안국역",
+    "to": "line3_종로3가역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_종로3가역",
+    "to": "line3_을지로3가역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_을지로3가역",
+    "to": "line3_충무로역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_충무로역",
+    "to": "line3_동대입구역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_동대입구역",
+    "to": "line3_약수역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_약수역",
+    "to": "line3_금호역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_금호역",
+    "to": "line3_옥수역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_옥수역",
+    "to": "line3_압구정역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_압구정역",
+    "to": "line3_신사역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_신사역",
+    "to": "line3_잠원역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_잠원역",
+    "to": "line3_고속터미널역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_고속터미널역",
+    "to": "line3_교대역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_교대역",
+    "to": "line3_남부터미널역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_남부터미널역",
+    "to": "line3_양재역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_양재역",
+    "to": "line3_매봉역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_매봉역",
+    "to": "line3_도곡역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_도곡역",
+    "to": "line3_대치역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_대치역",
+    "to": "line3_학여울역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_학여울역",
+    "to": "line3_대청역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_대청역",
+    "to": "line3_일원역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line3_일원역",
+    "to": "line3_수서역",
+    "line": 3,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_당고개역",
+    "to": "line4_상계역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_상계역",
+    "to": "line4_노원역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_노원역",
+    "to": "line4_창동역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_창동역",
+    "to": "line4_쌍문역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_쌍문역",
+    "to": "line4_수유역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_수유역",
+    "to": "line4_미아역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_미아역",
+    "to": "line4_미아사거리역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_미아사거리역",
+    "to": "line4_길음역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_길음역",
+    "to": "line4_성신여대입구역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_성신여대입구역",
+    "to": "line4_한성대입구역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_한성대입구역",
+    "to": "line4_혜화역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_혜화역",
+    "to": "line4_동대문역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_동대문역",
+    "to": "line4_동대문역사문화공원역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_동대문역사문화공원역",
+    "to": "line4_충무로역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_충무로역",
+    "to": "line4_명동역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_명동역",
+    "to": "line4_회현역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_회현역",
+    "to": "line4_서울역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_서울역",
+    "to": "line4_숙대입구역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_숙대입구역",
+    "to": "line4_삼각지역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_삼각지역",
+    "to": "line4_신용산역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_신용산역",
+    "to": "line4_이촌역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_이촌역",
+    "to": "line4_동작역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_동작역",
+    "to": "line4_총신대입구역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_총신대입구역",
+    "to": "line4_사당역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line4_사당역",
+    "to": "line4_남태령역",
+    "line": 4,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_방화역",
+    "to": "line5_개화산역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_개화산역",
+    "to": "line5_김포공항역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_김포공항역",
+    "to": "line5_송정역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_송정역",
+    "to": "line5_마곡역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_마곡역",
+    "to": "line5_발산역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_발산역",
+    "to": "line5_우장산역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_우장산역",
+    "to": "line5_화곡역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_화곡역",
+    "to": "line5_까치산역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_까치산역",
+    "to": "line5_신정역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_신정역",
+    "to": "line5_목동역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_목동역",
+    "to": "line5_오목교역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_오목교역",
+    "to": "line5_양평역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_양평역",
+    "to": "line5_영등포구청역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_영등포구청역",
+    "to": "line5_영등포시장역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_영등포시장역",
+    "to": "line5_신길역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_신길역",
+    "to": "line5_여의도역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_여의도역",
+    "to": "line5_여의나루역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_여의나루역",
+    "to": "line5_마포역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_마포역",
+    "to": "line5_공덕역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_공덕역",
+    "to": "line5_애오개역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_애오개역",
+    "to": "line5_충정로역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_충정로역",
+    "to": "line5_서대문역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_서대문역",
+    "to": "line5_광화문역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_광화문역",
+    "to": "line5_종로3가역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_종로3가역",
+    "to": "line5_을지로4가역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_을지로4가역",
+    "to": "line5_동대문역사문화공원역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_동대문역사문화공원역",
+    "to": "line5_청구역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_청구역",
+    "to": "line5_신금호역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_신금호역",
+    "to": "line5_행당역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_행당역",
+    "to": "line5_왕십리역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_왕십리역",
+    "to": "line5_마장역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_마장역",
+    "to": "line5_답십리역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_답십리역",
+    "to": "line5_장한평역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_장한평역",
+    "to": "line5_군자역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_군자역",
+    "to": "line5_아차산역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_아차산역",
+    "to": "line5_광나루역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_광나루역",
+    "to": "line5_천호역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_천호역",
+    "to": "line5_강동역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_강동역",
+    "to": "line5_길동역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_길동역",
+    "to": "line5_굽은다리역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_굽은다리역",
+    "to": "line5_명일역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_명일역",
+    "to": "line5_고덕역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line5_고덕역",
+    "to": "line5_상일동역",
+    "line": 5,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_응암역",
+    "to": "line6_역촌역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_역촌역",
+    "to": "line6_불광역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_불광역",
+    "to": "line6_독바위역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_독바위역",
+    "to": "line6_연신내역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_연신내역",
+    "to": "line6_구산역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_구산역",
+    "to": "line6_새절역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_새절역",
+    "to": "line6_증산역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_증산역",
+    "to": "line6_디지털미디어시티역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_디지털미디어시티역",
+    "to": "line6_월드컵경기장역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_월드컵경기장역",
+    "to": "line6_마포구청역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_마포구청역",
+    "to": "line6_망원역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_망원역",
+    "to": "line6_합정역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_합정역",
+    "to": "line6_상수역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_상수역",
+    "to": "line6_광흥창역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_광흥창역",
+    "to": "line6_대흥역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_대흥역",
+    "to": "line6_공덕역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_공덕역",
+    "to": "line6_효창공원앞역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_효창공원앞역",
+    "to": "line6_삼각지역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_삼각지역",
+    "to": "line6_녹사평역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_녹사평역",
+    "to": "line6_이태원역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_이태원역",
+    "to": "line6_한강진역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_한강진역",
+    "to": "line6_버티고개역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_버티고개역",
+    "to": "line6_약수역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_약수역",
+    "to": "line6_청구역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_청구역",
+    "to": "line6_신당역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_신당역",
+    "to": "line6_동묘앞역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_동묘앞역",
+    "to": "line6_창신역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_창신역",
+    "to": "line6_보문역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_보문역",
+    "to": "line6_안암역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_안암역",
+    "to": "line6_고려대역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_고려대역",
+    "to": "line6_월곡역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_월곡역",
+    "to": "line6_상월곡역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_상월곡역",
+    "to": "line6_돌곶이역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_돌곶이역",
+    "to": "line6_석계역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_석계역",
+    "to": "line6_태릉입구역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_태릉입구역",
+    "to": "line6_화랑대역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line6_화랑대역",
+    "to": "line6_봉화산역",
+    "line": 6,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_장암역",
+    "to": "line7_도봉산역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_도봉산역",
+    "to": "line7_수락산역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_수락산역",
+    "to": "line7_마들역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_마들역",
+    "to": "line7_노원역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_노원역",
+    "to": "line7_중계역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_중계역",
+    "to": "line7_하계역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_하계역",
+    "to": "line7_공릉역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_공릉역",
+    "to": "line7_태릉입구역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_태릉입구역",
+    "to": "line7_먹골역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_먹골역",
+    "to": "line7_중화역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_중화역",
+    "to": "line7_상봉역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_상봉역",
+    "to": "line7_면목역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_면목역",
+    "to": "line7_사가정역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_사가정역",
+    "to": "line7_용마산역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_용마산역",
+    "to": "line7_중곡역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_중곡역",
+    "to": "line7_군자역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_군자역",
+    "to": "line7_어린이대공원역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_어린이대공원역",
+    "to": "line7_건대입구역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_건대입구역",
+    "to": "line7_뚝섬유원지역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_뚝섬유원지역",
+    "to": "line7_청담역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_청담역",
+    "to": "line7_강남구청역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_강남구청역",
+    "to": "line7_학동역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_학동역",
+    "to": "line7_논현역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_논현역",
+    "to": "line7_반포역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_반포역",
+    "to": "line7_고속터미널역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_고속터미널역",
+    "to": "line7_내방역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_내방역",
+    "to": "line7_이수역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_이수역",
+    "to": "line7_남성역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_남성역",
+    "to": "line7_숭실대입구역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_숭실대입구역",
+    "to": "line7_상도역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_상도역",
+    "to": "line7_장승배기역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_장승배기역",
+    "to": "line7_신대방삼거리역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_신대방삼거리역",
+    "to": "line7_보라매역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_보라매역",
+    "to": "line7_신풍역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_신풍역",
+    "to": "line7_대림역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_대림역",
+    "to": "line7_남구로역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_남구로역",
+    "to": "line7_가산디지털단지역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_가산디지털단지역",
+    "to": "line7_철산역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_철산역",
+    "to": "line7_광명사거리역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line7_광명사거리역",
+    "to": "line7_천왕역",
+    "line": 7,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_암사역",
+    "to": "line8_천호역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_천호역",
+    "to": "line8_강동구청역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_강동구청역",
+    "to": "line8_몽촌토성역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_몽촌토성역",
+    "to": "line8_잠실역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_잠실역",
+    "to": "line8_석촌역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_석촌역",
+    "to": "line8_송파역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_송파역",
+    "to": "line8_가락시장역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_가락시장역",
+    "to": "line8_문정역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_문정역",
+    "to": "line8_장지역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_장지역",
+    "to": "line8_복정역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_복정역",
+    "to": "line8_남위례역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_남위례역",
+    "to": "line8_산성역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_산성역",
+    "to": "line8_남한산성입구역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_남한산성입구역",
+    "to": "line8_단대오거리역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_단대오거리역",
+    "to": "line8_신흥역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_신흥역",
+    "to": "line8_수진역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  },
+  {
+    "from": "line8_수진역",
+    "to": "line8_모란역",
+    "line": 8,
+    "minutes": 2,
+    "is_transfer": false
+  }
+]

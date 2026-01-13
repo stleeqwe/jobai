@@ -23,6 +23,8 @@ export default {
       animation: {
         'fade-in-up': 'fadeInUp 0.3s ease-out',
         'pulse-soft': 'pulseSoft 2s infinite',
+        'slide-up': 'slideUp 0.3s ease-out forwards',
+        'bounce-subtle': 'bounceSubtle 0.5s ease-out',
       },
       keyframes: {
         fadeInUp: {
@@ -32,6 +34,14 @@ export default {
         pulseSoft: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.5' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        bounceSubtle: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-5px)' },
         }
       }
     },

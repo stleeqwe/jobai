@@ -2,15 +2,17 @@ import { useState, useCallback, useRef } from 'react'
 import { Message, Job, PaginationInfo, Coordinates } from '../types'
 import { chatApi } from '../services/api'
 
+interface SearchParams {
+  job_type?: string
+  salary_min?: number
+  location_query?: string
+  max_commute_minutes?: number
+}
+
 const INITIAL_MESSAGE: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: `안녕하세요! 원하시는 채용 조건을 자연어로 말씀해주세요.
-
-예시:
-- "강남역 근처 웹디자이너, 연봉 4천 이상"
-- "판교 백엔드 개발자, 신입 환영"
-- "마케터, 정규직, 서울"`,
+  content: '원하시는 채용 조건을 자연어로 말씀해주세요.',
   jobs: [],
   timestamp: new Date()
 }
@@ -20,6 +22,7 @@ interface SearchContext {
   pagination: PaginationInfo
   allJobs: Job[]
   userCoordinates?: Coordinates | null
+  searchParams?: SearchParams
 }
 
 interface UseChatOptions {
@@ -32,6 +35,7 @@ export function useChat(options: UseChatOptions = {}) {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lastSearchParams, setLastSearchParams] = useState<SearchParams | null>(null)
 
   // 현재 검색 컨텍스트 저장 (더 보기용)
   const searchContextRef = useRef<SearchContext | null>(null)
@@ -61,12 +65,22 @@ export function useChat(options: UseChatOptions = {}) {
         userCoordinates
       })
 
+      // 검색 파라미터 저장
+      const searchParams: SearchParams = {
+        job_type: response.search_params?.job_type as string,
+        salary_min: response.search_params?.salary_min as number,
+        location_query: response.search_params?.location_query as string,
+        max_commute_minutes: response.search_params?.max_commute_minutes as number
+      }
+      setLastSearchParams(searchParams)
+
       // 검색 컨텍스트 저장
       searchContextRef.current = {
         message: content,
         pagination: response.pagination,
         allJobs: response.jobs,
-        userCoordinates
+        userCoordinates,
+        searchParams
       }
 
       // AI 응답 추가
@@ -102,18 +116,17 @@ export function useChat(options: UseChatOptions = {}) {
 
   const loadMoreJobs = useCallback(async () => {
     const context = searchContextRef.current
-    if (!context || !context.pagination.has_next) return
+    if (!context || !context.pagination.has_next || !conversationId) return
 
     setIsLoadingMore(true)
 
     try {
       const nextPage = context.pagination.page + 1
-      const response = await chatApi.send({
-        message: context.message,
+      // 캐시 기반 API 사용 (AI 재호출 없음)
+      const response = await chatApi.loadMore({
         conversationId,
         page: nextPage,
-        pageSize: 20,
-        userCoordinates: context.userCoordinates
+        pageSize: 20
       })
 
       // 새 공고들을 기존에 추가
@@ -159,6 +172,7 @@ export function useChat(options: UseChatOptions = {}) {
     setMessages([INITIAL_MESSAGE])
     setConversationId(null)
     setError(null)
+    setLastSearchParams(null)
     searchContextRef.current = null
   }, [])
 
@@ -170,6 +184,7 @@ export function useChat(options: UseChatOptions = {}) {
     sendMessage,
     loadMoreJobs,
     clearError,
-    resetChat
+    resetChat,
+    lastSearchParams
   }
 }

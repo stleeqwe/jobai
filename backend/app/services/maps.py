@@ -163,6 +163,7 @@ class MapsService:
                 origins=[origin_query],
                 destinations=destinations,
                 mode=mode,
+                transit_mode=["bus", "subway"],  # 버스 + 지하철만
                 language="ko",
                 region="kr"
             )

@@ -46,6 +46,13 @@ export interface ChatResponse {
   error?: string
 }
 
+export interface LoadMoreResponse {
+  success: boolean
+  jobs: Job[]
+  pagination: PaginationInfo
+  search_params: Record<string, unknown>
+}
+
 export interface ChatState {
   messages: Message[]
   isLoading: boolean

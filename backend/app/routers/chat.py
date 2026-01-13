@@ -8,7 +8,9 @@ from app.models.schemas import (
     ChatRequest,
     ChatResponse,
     JobItem,
-    PaginationInfo
+    PaginationInfo,
+    LoadMoreRequest,
+    LoadMoreResponse
 )
 from app.services.gemini import gemini_service
 
@@ -81,4 +83,50 @@ async def chat(request: ChatRequest):
         raise
     except Exception as e:
         logger.exception(f"Chat API 오류: {e}")
+        raise HTTPException(status_code=500, detail="서비스 오류가 발생했습니다.")
+
+
+@router.post("/chat/more", response_model=LoadMoreResponse)
+async def load_more(request: LoadMoreRequest):
+    """
+    캐시된 검색 결과에서 추가 페이지 로드 (AI 재호출 없음)
+
+    이 엔드포인트는 /chat에서 검색한 결과를 캐시에서 가져옵니다.
+    AI를 다시 호출하지 않으므로 빠르고 비용이 들지 않습니다.
+
+    Args:
+        request.conversation_id: 대화 ID
+        request.page: 페이지 번호
+        request.page_size: 페이지당 결과 수
+
+    Returns:
+        캐시된 검색 결과의 해당 페이지
+    """
+    try:
+        result = gemini_service.get_cached_page(
+            conversation_id=request.conversation_id,
+            page=request.page,
+            page_size=request.page_size
+        )
+
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail="검색 결과를 찾을 수 없습니다. 새로 검색해주세요."
+            )
+
+        jobs = [JobItem(**job) for job in result["jobs"]]
+        pagination = PaginationInfo(**result["pagination"])
+
+        return LoadMoreResponse(
+            success=True,
+            jobs=jobs,
+            pagination=pagination,
+            search_params=result.get("search_params", {})
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Load More API 오류: {e}")
         raise HTTPException(status_code=500, detail="서비스 오류가 발생했습니다.")

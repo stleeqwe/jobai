@@ -1,5 +1,26 @@
 # JobChat 프로젝트 유의사항
 
+## MVP 범위 정의
+
+### 지역 범위
+- **서울 전체** (25개 구)
+- 크롤러 설정: `TARGET_LOCAL_CODE = "I000"` (서울 전체)
+
+### 직무 범위
+| 카테고리 | 포함 직무 |
+|----------|----------|
+| **개발** | 백엔드, 프론트엔드, 풀스택, 앱개발, 데이터, AI, DevOps, QA 등 |
+| **디자인** | UI/UX, 웹디자인, 그래픽, 영상, 제품, 브랜드 디자인 등 |
+| **마케팅** | 퍼포먼스, 콘텐츠, 브랜드, CRM 마케팅 등 |
+| **기획** | 서비스기획, PM, 사업기획, 전략기획 등 |
+| **경영지원** | 인사, 총무, 재무회계, 법무, 비서 등 |
+
+### MVP 제외 범위
+- 지역: 서울 외 지역 (경기, 인천 등)
+- 직무: 영업, 서비스, 의료, 교육, 연구개발 등
+
+---
+
 ## 크롤러 관련 이슈 및 해결 방법
 
 ### 1. HTML 셀렉터 문제 (P0 - Critical)
@@ -62,23 +83,14 @@ jobs = await scraper._crawl_page_with_client(client, page, 0, fetch_details=True
 
 ### 3. MVP 필터링 로직
 
-**MVP 카테고리**: 개발, 디자인, 마케팅, 기획
+**MVP 카테고리**: 개발, 디자인, 마케팅, 기획, 경영지원
 
-**필터링 방식**: 제목 기반 키워드 매칭
-```python
-# 키워드 예시
-MVP_JOB_FILTERS = {
-    "개발": ["개발자", "developer", "engineer", "백엔드", "프론트엔드", ...],
-    "디자인": ["디자이너", "designer", "ui", "ux", ...],
-    "마케팅": ["마케터", "marketing", "광고", "콘텐츠", ...],
-    "기획": ["기획자", "pm", "po", "서비스기획", ...],
-}
-```
+**필터링 방식**: 제목 기반 키워드 매칭 → `mvp_category` 필드 저장
 
 **주의사항**:
-- 제목에 키워드가 없으면 필터링됨
 - `mvp_category` 필드가 Firestore에 저장됨
-- Backend 검색 시 `mvp_category` 우선 매칭
+- MVP 범위 외 직무는 `mvp_category: "기타"`로 저장
+- Backend AI 검색은 전체 공고 대상으로 의미적 매칭 수행
 
 ---
 
@@ -205,44 +217,54 @@ stats = await get_job_stats()
 
 ---
 
-## 아키텍처 V3 (3-Stage Sequential Filter with Maps API)
+## 아키텍처 V4 (3-Stage Sequential Filter with Subway)
 
-### V2의 한계
+### V3의 한계
 
 | 문제 | 원인 |
 |------|------|
-| 위치 필터 실패 | "을지로역" → "중구" 수동 매핑 불가능 |
-| 직무 매칭 실패 | AI가 "프론트 앱 개발자"와 "웹디자이너" 혼동 |
-| 연봉 필터 실패 | 대부분 공고가 `salary_min=None` |
-| 불완전한 검색 | 필수 조건 없이도 검색 시도 |
+| Maps API 비용 | $1.25/검색으로 비용 부담 |
+| 위치 파싱 AI 호출 | 불필요한 AI 호출로 지연 발생 |
+| 복수 출발지 처리 | 복잡한 로직으로 유지보수 어려움 |
 
-### V3 핵심 원칙
+### V4 핵심 원칙
 
 ```
-1. 필수 정보 수집: 직무, 연봉, 지역 - 3가지 없으면 검색 안함
+1. 필수 정보 수집: 직무 + 연봉 (지역은 선택)
 2. 직무 우선 필터: AI가 의미적으로 직무 매칭 (Stage 1)
 3. 연봉 유연 필터: 회사내규/협상가능 포함 (Stage 2)
-4. Maps API 거리 계산: 실제 이동시간 기반 필터링 (Stage 3)
+4. 지하철 기반 거리 계산: AI 호출 없이 규칙 기반 (Stage 3)
+   - location_query를 그대로 SeoulSubwayCommute에 전달
+   - 역명/구/동 → 좌표 변환은 모듈 내부에서 처리
 ```
 
 ### 3-Stage 흐름
 
 ```
-[Phase 0: 필수 정보 수집]
-직무 + 연봉 + 지역 → 3가지 모두 필수
+[Phase 0: Function Call로 파라미터 추출]
+"을지로역 부근 웹 디자이너 연봉 4천"
+        │
+        ▼ Gemini AI (1회 호출)
+{job_type: "웹 디자이너", salary_min: 4000, location_query: "을지로역"}
         │
         ▼
 [Stage 1: 직무 필터 - AI]
-전체 공고 → AI가 의미적 매칭 → ~100건
+전체 공고 → AI가 의미적 매칭 → ~20건
         │
         ▼
 [Stage 2: 연봉 필터 - DB]
-salary_min >= 요청값 OR NULL (회사내규) → ~80건
+salary_min >= 요청값 OR 회사내규 → ~15건
         │
         ▼
-[Stage 3: 지역 필터 - Maps API]
-Google Maps Distance Matrix API로 실제 이동시간 계산
-"을지로역에서 30분 이내" → 주소 없는 공고 제외 → ~20건
+[Stage 3: 거리 필터 - 지하철 기반 (AI 호출 없음)]
+subway_service.filter_jobs_by_travel_time(
+    jobs=stage2_jobs,
+    origin="을지로역",    ← location_query 그대로 전달
+    max_minutes=60
+)
+        │
+        ▼ SeoulSubwayCommute._parse_location() (규칙 기반)
+"을지로역" → 을지로입구역 좌표 → Dijkstra → 통근시간 계산
         │
         ▼
 [결과 반환]
@@ -253,23 +275,27 @@ Google Maps Distance Matrix API로 실제 이동시간 계산
 
 | 파일 | 역할 |
 |------|------|
-| `docs/ARCHITECTURE_V3.md` | 상세 설계 문서 |
-| `backend/app/services/gemini.py` | Phase 0 가이드 + Stage 1 직무 필터 |
+| `docs/SUBWAY_COMMUTE_MODULE.md` | 지하철 통근시간 모듈 상세 문서 |
+| `crawler/CRAWLER.md` | 크롤러 유지보수 가이드 |
+| `backend/app/services/gemini.py` | Function Call + 3-Stage 파이프라인 |
 | `backend/app/services/job_search.py` | Stage 2 연봉 필터 |
-| `backend/app/services/maps.py` | Stage 3 Maps API 연동 (신규) |
-| `backend/app/config.py` | GOOGLE_MAPS_API_KEY 추가 |
+| `backend/app/services/subway.py` | Stage 3 지하철 서비스 래퍼 |
+| `backend/app/services/seoul_subway_commute.py` | 지하철 통근시간 계산 핵심 모듈 |
 
-### 환경 설정
+### 비용 비교
 
-```bash
-# backend/.env 에 추가
-GOOGLE_MAPS_API_KEY=your_api_key_here
-```
+| 항목 | V3 (Maps API) | V4 (Subway) |
+|------|---------------|-------------|
+| API 비용 | $1.25/검색 | **$0** |
+| AI 호출 | 2회 (Function Call + 위치 파싱) | **1회** (Function Call만) |
+| 지연시간 | ~3초 | **~1초** |
 
 ---
 
 ## 변경 이력
 
+- **2026-01-13**: 크롤러 `location_full` 필드 누락 수정, 기존 데이터 마이그레이션 (649건)
+- **2026-01-13**: 아키텍처 V4 (지하철 기반, AI 위치 파싱 제거)
 - **2026-01-13**: 아키텍처 V3 설계 (3-Stage Sequential Filter with Maps API)
 - **2026-01-13**: 아키텍처 V2 설계 (2-Stage Hybrid) - 한계로 인해 V3로 대체
 - **2026-01-12**: HTML 셀렉터 수정, MVP 필터링 개선, CORS 설정 수정

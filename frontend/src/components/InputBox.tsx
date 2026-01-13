@@ -32,7 +32,7 @@ export function InputBox({ onSend, disabled }: Props) {
         placeholder="예: 강남역 근처 웹디자이너, 연봉 4천 이상..."
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="flex-1 resize-none rounded-xl border border-gray-300 px-4 py-3 text-base focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
       />
       <button
         onClick={handleSubmit}

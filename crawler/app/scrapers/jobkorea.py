@@ -70,10 +70,10 @@ class JobKoreaScraper:
     LIST_URL = f"{BASE_URL}/recruit/joblist"
     DETAIL_URL = f"{BASE_URL}/Recruit/GI_Read"
 
-    # 크롤링 대상 지역 코드 (현재: 강남구만)
-    TARGET_LOCAL_CODE = "I010"  # 강남구
+    # 크롤링 대상 지역 코드 (MVP: 서울 전체)
+    TARGET_LOCAL_CODE = "I000"  # 서울 전체
 
-    # 서울 지역 코드 (참조용)
+    # 서울 지역 코드
     SEOUL_LOCAL_CODE = "I000"
 
     # 서울 구별 코드 (분산 크롤링용)
@@ -241,9 +241,19 @@ class JobKoreaScraper:
         return all_jobs, total_saved
 
     async def _crawl_page_with_client(
-        self, client: httpx.AsyncClient, page: int, worker_id: int
+        self, client: httpx.AsyncClient, page: int, worker_id: int,
+        fetch_details: bool = True, parallel_batch_size: int = 10
     ) -> Optional[List[Dict]]:
-        """특정 클라이언트로 페이지 크롤링"""
+        """
+        특정 클라이언트로 페이지 크롤링 (상세 페이지 병렬 호출 지원)
+
+        Args:
+            client: HTTP 클라이언트
+            page: 페이지 번호
+            worker_id: 워커 ID
+            fetch_details: 상세 페이지 호출 여부
+            parallel_batch_size: 병렬 호출 배치 크기 (기본 5)
+        """
         params = {
             "menucode": "local",
             "local": self.TARGET_LOCAL_CODE,
@@ -260,34 +270,62 @@ class JobKoreaScraper:
             return None
 
         soup = BeautifulSoup(response.text, "lxml")
-        jobs = []
 
-        job_items = soup.select("li.job-recommendation-item")
+        # 셀렉터 우선순위: li.devloopArea (663건) > li.job-recommendation-item (3건)
+        job_items = soup.select("li.devloopArea")
         if not job_items:
-            job_items = soup.select(".devloopArea")
+            job_items = soup.select("li.job-recommendation-item")
 
         if not job_items:
             return None  # 더 이상 공고 없음
 
+        # 1단계: 모든 아이템에서 기본 정보 파싱
+        parsed_jobs = []
         for item in job_items:
             try:
                 job = self._parse_job_item(item)
                 if job and job.get("id"):
-                    # 상세 페이지에서 직무 정보 추출
-                    job_id = job["id"].replace("jk_", "")
-                    detail_info = await self._fetch_detail_info(client, job_id)
-                    if detail_info:
-                        job.update(detail_info)
-
-                    jobs.append(job)
-
-                    # 상세 페이지 요청 간 딜레이
-                    await asyncio.sleep(0.3 + random.uniform(0.1, 0.3))
-
+                    parsed_jobs.append(job)
             except Exception as e:
                 if settings.DEBUG:
                     print(f"[Worker-{worker_id}] 아이템 파싱 실패: {e}")
                 continue
+
+        if not fetch_details:
+            return parsed_jobs
+
+        # 2단계: 상세 페이지 병렬 호출 (배치 단위)
+        async def fetch_detail_with_delay(job: Dict, batch_idx: int) -> Dict:
+            """상세 정보 가져오기 (배치 내 딜레이 적용)"""
+            try:
+                job_id = job["id"].replace("jk_", "")
+                detail_info = await self._fetch_detail_info(client, job_id)
+                if detail_info:
+                    job.update(detail_info)
+            except Exception as e:
+                if settings.DEBUG:
+                    print(f"[Worker-{worker_id}] 상세 정보 실패 ({job['id']}): {e}")
+            return job
+
+        jobs = []
+        for batch_start in range(0, len(parsed_jobs), parallel_batch_size):
+            batch = parsed_jobs[batch_start:batch_start + parallel_batch_size]
+
+            # 배치 내 병렬 호출
+            tasks = [
+                fetch_detail_with_delay(job, i)
+                for i, job in enumerate(batch)
+            ]
+            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 성공한 결과만 추가
+            for result in batch_results:
+                if isinstance(result, dict):
+                    jobs.append(result)
+
+            # 배치 간 딜레이 (차단 방지) - 최적화: 0.3~0.5초
+            if batch_start + parallel_batch_size < len(parsed_jobs):
+                await asyncio.sleep(0.3 + random.uniform(0.1, 0.2))
 
         return jobs
 
@@ -537,25 +575,33 @@ class JobKoreaScraper:
             # 5. 급여 파싱 (구조화)
             salary_data = parse_salary(salary_text)
 
-            # 6. 회사 주소 추출
+            # 6. 회사 주소 추출 (JSON-LD 우선)
             company_address = ""
-            address_patterns = [
-                r'(서울[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
-                r'(경기[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
-                r'(인천[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
-                r'(부산[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
-                r'근무지역\s*[:：]\s*([^\n<]{10,50})',
-                r'근무지\s*[:：]\s*([^\n<]{10,50})',
-            ]
-            for pattern in address_patterns:
-                match = re.search(pattern, html)
-                if match:
-                    addr = match.group(1).strip()
-                    addr = re.sub(r'\s*\([^)]*$', '', addr)
-                    addr = re.sub(r'["\'/].*', '', addr).strip()
-                    if addr and 10 <= len(addr) <= 60:
-                        company_address = addr
-                        break
+
+            # 6-1. JSON-LD addressLocality 추출 (가장 정확)
+            json_ld_match = re.search(r'"addressLocality"\s*:\s*"([^"]+)"', html)
+            if json_ld_match:
+                company_address = json_ld_match.group(1).strip()
+
+            # 6-2. JSON-LD 없으면 기존 패턴으로 추출
+            if not company_address:
+                address_patterns = [
+                    r'(서울[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
+                    r'(경기[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
+                    r'(인천[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
+                    r'(부산[^\n<,]{5,50}(?:동|로|길)[^\n<,]{0,20})',
+                    r'근무지역\s*[:：]\s*([^\n<]{10,50})',
+                    r'근무지\s*[:：]\s*([^\n<]{10,50})',
+                ]
+                for pattern in address_patterns:
+                    match = re.search(pattern, html)
+                    if match:
+                        addr = match.group(1).strip()
+                        addr = re.sub(r'\s*\([^)]*$', '', addr)
+                        addr = re.sub(r'["\'/].*', '', addr).strip()
+                        if addr and 10 <= len(addr) <= 60:
+                            company_address = addr
+                            break
 
             # 7. 기업규모 추출
             company_size = ""
@@ -608,6 +654,9 @@ class JobKoreaScraper:
             category = get_job_category(normalized) if normalized else "기타"
             mvp_category = get_mvp_category(category)
 
+            # 주소에서 location 정보 추출
+            location_info = normalize_location(company_address) if company_address else {}
+
             return {
                 "job_type": normalized or primary_job_type,
                 "job_type_raw": ", ".join(job_types[:3]),
@@ -623,6 +672,11 @@ class JobKoreaScraper:
                 "company_size": company_size,
                 "benefits": benefits,
                 "job_description": job_description,
+                # 위치 정보 추가 (상세 페이지에서 추출한 주소로 덮어씀)
+                "location_full": company_address,
+                "location_sido": location_info.get("sido", ""),
+                "location_gugun": location_info.get("gugun", ""),
+                "location_dong": location_info.get("dong", ""),
                 **deadline_info,
             }
 
@@ -677,38 +731,40 @@ class JobKoreaScraper:
         return result
 
     def _parse_job_item(self, item) -> Optional[Dict]:
-        """채용공고 아이템 파싱 (목록 페이지)"""
-        # 회사명 추출
-        company_el = item.select_one(".company-name > a, .company-name a")
-        company_name = company_el.get_text(strip=True) if company_el else ""
+        """채용공고 아이템 파싱 (목록 페이지) - 2026년 HTML 구조"""
+        # 공고 ID 추출 (data-info 속성에서)
+        data_info = item.get("data-info", "")
+        job_id = None
+        if data_info:
+            parts = data_info.strip().split("|")
+            if parts and parts[0].isdigit():
+                job_id = parts[0].strip()
 
-        # 제목 추출
-        title_el = item.select_one("p.title > a, .title a")
+        if not job_id:
+            return None
+
+        # 제목 추출 (.description a .text)
+        title_el = item.select_one(".description a .text")
         title = title_el.get_text(strip=True) if title_el else ""
 
         if not title:
             return None
 
-        # 링크에서 공고 ID 추출
-        href = ""
-        if title_el:
-            href = title_el.get("href", "")
-        elif company_el:
-            href = company_el.get("href", "")
+        # 회사명 추출 (.company .name a)
+        company_el = item.select_one(".company .name a")
+        company_name = ""
+        if company_el:
+            # a 태그 내에서 span.logo 제외한 텍스트만 추출
+            for child in company_el.children:
+                if isinstance(child, str):
+                    company_name += child.strip()
+                elif hasattr(child, 'name') and child.name != 'span':
+                    company_name += child.get_text(strip=True)
+            company_name = company_name.strip()
 
-        job_id = None
-        match = re.search(r"/GI_Read/(\d+)", href)
-        if match:
-            job_id = match.group(1)
-        else:
-            data_info = item.get("data-info", "")
-            if data_info:
-                parts = data_info.strip().split("|")
-                if parts:
-                    job_id = parts[0].strip()
-
-        if not job_id:
-            return None
+        # 링크 추출
+        link_el = item.select_one(".description a")
+        href = link_el.get("href", "") if link_el else ""
 
         # 태그 정보 추출
         tags = item.select(".tags-wrapper .tag, .tag")
@@ -732,9 +788,11 @@ class JobKoreaScraper:
             elif text in ["정규직", "계약직", "인턴", "프리랜서", "아르바이트", "파트타임"]:
                 employment_type = text
 
-        # 마감일 추출
+        # 마감일 추출 (.dday .deadLine)
         deadline = ""
-        dday_el = item.select_one("[class*='day'], [class*='dday'], .date")
+        dday_el = item.select_one(".dday .deadLine")
+        if not dday_el:
+            dday_el = item.select_one("[class*='dday'], [class*='deadline']")
         if dday_el:
             deadline = dday_el.get_text(strip=True)
 
