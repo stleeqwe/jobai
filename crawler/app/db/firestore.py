@@ -1,11 +1,42 @@
 """Firestore 데이터베이스 모듈"""
 
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Union
 from google.cloud import firestore
 from google.oauth2 import service_account
 
 from app.config import settings
+
+
+def _normalize_datetime(dt: Union[datetime, str, None]) -> Optional[datetime]:
+    """
+    다양한 형태의 datetime을 UTC aware datetime으로 정규화
+
+    Args:
+        dt: datetime 객체, ISO 문자열, 또는 None
+
+    Returns:
+        UTC timezone aware datetime 또는 None
+    """
+    if dt is None:
+        return None
+
+    try:
+        # 문자열인 경우
+        if isinstance(dt, str):
+            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+
+        # datetime 객체인 경우
+        if isinstance(dt, datetime):
+            # timezone이 없으면 UTC로 가정
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+
+    except (ValueError, TypeError):
+        pass
+
+    return None
 
 # Firestore 클라이언트 (lazy initialization)
 _db: Optional[firestore.Client] = None
@@ -240,40 +271,23 @@ async def expire_by_deadline() -> int:
 
         if deadline_type == "date" and deadline_date:
             # datetime 객체로 변환
-            if isinstance(deadline_date, str):
-                try:
-                    deadline_date = datetime.fromisoformat(deadline_date.replace("Z", "+00:00"))
-                except:
-                    deadline_date = None
-
+            deadline_date = _normalize_datetime(deadline_date)
             if deadline_date and deadline_date < today:
                 should_expire = True
 
         elif deadline_type == "ongoing":
             # 상시채용: 90일 후 needs_verification 플래그
             created_at = job.get("created_at")
-            if created_at:
-                if isinstance(created_at, str):
-                    try:
-                        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                    except:
-                        created_at = None
-
-                if created_at and (now - created_at).days >= 90:
-                    update_data["needs_verification"] = True
+            created_at = _normalize_datetime(created_at)
+            if created_at and (now - created_at).days >= 90:
+                update_data["needs_verification"] = True
 
         elif deadline_type == "until_hired":
             # 채용시 마감: 30일 후 needs_verification 플래그
             created_at = job.get("created_at")
-            if created_at:
-                if isinstance(created_at, str):
-                    try:
-                        created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-                    except:
-                        created_at = None
-
-                if created_at and (now - created_at).days >= 30:
-                    update_data["needs_verification"] = True
+            created_at = _normalize_datetime(created_at)
+            if created_at and (now - created_at).days >= 30:
+                update_data["needs_verification"] = True
 
         if should_expire:
             update_data["is_active"] = False

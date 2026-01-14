@@ -7,8 +7,29 @@ import { JobCardSkeletonList } from './JobCardSkeleton'
 import { useChat } from '../hooks/useChat'
 import { useGeolocation } from '../hooks/useGeolocation'
 
+// V6: 위치 기반 통근시간 계산 복구
 export function ChatWindow() {
-  const geolocation = useGeolocation()
+  // 위치 정보 가져오기
+  const {
+    coordinates,
+    address,
+    loading: locationLoading,
+    error: locationError,
+    permission
+  } = useGeolocation()
+
+  // 위치 정보를 useChat에 전달
+  const userLocation = useMemo(() => {
+    if (coordinates) {
+      return {
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        address: address
+      }
+    }
+    return null
+  }, [coordinates, address])
+
   const {
     messages,
     isLoading,
@@ -19,25 +40,8 @@ export function ChatWindow() {
     clearError,
     resetChat,
     lastSearchParams
-  } = useChat({
-    userCoordinates: geolocation.coordinates
-  })
+  } = useChat({ userLocation })
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // 검색 결과가 있는지 확인
-  const hasResults = useMemo(() => {
-    return messages.some(m => m.role === 'assistant' && m.jobs.length > 0)
-  }, [messages])
-
-  // 마지막 검색 결과 메시지
-  const lastResultMessage = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant' && messages[i].jobs.length > 0) {
-        return messages[i]
-      }
-    }
-    return null
-  }, [messages])
 
   // 대화 메시지만 (welcome 제외)
   const conversationMessages = useMemo(() => {
@@ -49,9 +53,9 @@ export function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 메시지 전송 핸들러 (좌표 포함)
+  // V6: 간소화된 메시지 전송
   const handleSend = (content: string) => {
-    sendMessage(content, geolocation.coordinates)
+    sendMessage(content)
   }
 
   // 첫 진입 화면 (메시지 없음)
@@ -60,27 +64,34 @@ export function ChatWindow() {
       <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-primary-100">
         <WelcomeScreen onSubmit={handleSend} disabled={isLoading} />
 
-        {/* 위치 상태 표시 (하단) */}
+        {/* 위치 정보 상태 표시 */}
         <div className="border-t border-primary-50 px-4 py-2 bg-primary-50/50">
           <div className="flex justify-center items-center text-xs text-gray-500">
-            {geolocation.loading ? (
+            {locationLoading ? (
               <span className="flex items-center gap-2">
                 <span className="animate-pulse">📍</span>
-                위치 확인 중...
+                위치 정보를 가져오는 중...
               </span>
-            ) : geolocation.hasLocation ? (
+            ) : permission === 'denied' ? (
+              <span className="flex items-center gap-2 text-amber-600">
+                <span>⚠️</span>
+                위치 권한이 거부됨 - 메시지에 위치를 직접 입력해주세요
+              </span>
+            ) : address ? (
               <span className="flex items-center gap-2 text-green-600">
                 <span>📍</span>
-                {geolocation.address || '내 위치 사용 중'}
+                현재 위치: {address}
+              </span>
+            ) : coordinates ? (
+              <span className="flex items-center gap-2 text-green-600">
+                <span>📍</span>
+                위치 확인됨
               </span>
             ) : (
-              <button
-                onClick={geolocation.refreshLocation}
-                className="flex items-center gap-2 text-primary-500 hover:text-primary-700"
-              >
-                <span>📍</span>
-                위치 권한을 허용하면 더 정확한 검색이 가능해요
-              </button>
+              <span className="flex items-center gap-2">
+                <span>🚇</span>
+                출발 위치를 메시지에 포함하면 통근시간을 계산해드려요
+              </span>
             )}
           </div>
         </div>
@@ -88,7 +99,7 @@ export function ChatWindow() {
     )
   }
 
-  // 공통 헤더
+  // V6: 간소화된 헤더
   const Header = () => (
     <div className="bg-gradient-to-r from-primary-500 to-primary-600 text-white px-4 py-3 flex-shrink-0">
       <div className="flex justify-between items-center">
@@ -104,20 +115,18 @@ export function ChatWindow() {
 
         <h2 className="font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>JOBBOT</h2>
 
-        {/* 위치 상태 */}
+        {/* 위치 정보 표시 */}
         <div className="text-right">
-          {geolocation.hasLocation ? (
+          {address ? (
             <span className="text-xs text-primary-100 flex items-center gap-1">
-              <span className="text-green-300">📍</span>
-              {geolocation.address ? geolocation.address.split(' ').slice(-2).join(' ') : '위치 사용중'}
+              <span>📍</span>
+              {address}
             </span>
           ) : (
-            <button
-              onClick={geolocation.refreshLocation}
-              className="text-xs text-primary-200 hover:text-white"
-            >
-              📍 위치 설정
-            </button>
+            <span className="text-xs text-primary-100 flex items-center gap-1">
+              <span>🚇</span>
+              지하철 통근 계산
+            </span>
           )}
         </div>
       </div>
@@ -142,19 +151,20 @@ export function ChatWindow() {
     </div>
   ) : null
 
-  // 검색 결과가 없을 때: 일반 채팅 레이아웃
-  if (!hasResults) {
-    return (
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-        <div className="h-[calc(100vh-180px)] min-h-[400px] max-h-[600px] flex flex-col">
-          <Header />
-          <ErrorBanner />
+  // 통합 채팅 레이아웃
+  return (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+      <div className="h-[calc(100vh-240px)] min-h-[500px] flex flex-col">
+        <Header />
+        <ErrorBanner />
 
-          {/* 채팅 영역 */}
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 scrollbar-thin">
-            <div className="space-y-4">
-              {conversationMessages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+        {/* 채팅 영역 - 모든 메시지와 결과가 자연스럽게 흐름 */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 scrollbar-thin">
+          <div className="space-y-4">
+            {conversationMessages.map((message, idx) => (
+              <div key={message.id}>
+                {/* 메시지 버블 */}
+                <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {message.role === 'assistant' && (
                     <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium mr-2 flex-shrink-0">
                       AI
@@ -168,96 +178,57 @@ export function ChatWindow() {
                     <p className="text-base whitespace-pre-wrap">{message.content}</p>
                   </div>
                 </div>
-              ))}
-              {isLoading && (
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                    AI
+
+                {/* AI 응답에 채용공고가 있으면 바로 아래에 표시 */}
+                {message.role === 'assistant' && message.jobs && message.jobs.length > 0 && (
+                  <div className="mt-4 ml-10">
+                    {/* 검색 조건 요약 */}
+                    {lastSearchParams && idx === conversationMessages.length - 1 && (
+                      <SearchSummary
+                        searchParams={lastSearchParams}
+                        totalCount={message.pagination?.total_count || message.jobs.length}
+                      />
+                    )}
+
+                    {/* 채용공고 목록 */}
+                    <JobCardList
+                      jobs={message.jobs}
+                      pagination={message.pagination}
+                      onLoadMore={idx === conversationMessages.length - 1 ? loadMoreJobs : undefined}
+                      isLoadingMore={isLoadingMore}
+                    />
                   </div>
-                  <div className="bg-white rounded-2xl px-4 py-3 border border-gray-200 shadow-sm">
+                )}
+              </div>
+            ))}
+
+            {/* 로딩 인디케이터 */}
+            {isLoading && (
+              <div className="flex items-start gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  AI
+                </div>
+                <div className="flex-1">
+                  <div className="bg-white rounded-2xl px-4 py-3 border border-gray-200 shadow-sm inline-block">
                     <div className="flex space-x-1.5">
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse-soft" />
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse-soft" style={{ animationDelay: '200ms' }} />
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse-soft" style={{ animationDelay: '400ms' }} />
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* 입력 영역 */}
-          <div className="border-t border-gray-200 p-4 bg-white flex-shrink-0">
-            <InputBox onSend={handleSend} disabled={isLoading} />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // 검색 결과가 있을 때: 결과 중심 레이아웃
-  return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-      <div className="h-[calc(100vh-180px)] min-h-[600px] max-h-[800px] flex flex-col">
-        <Header />
-        <ErrorBanner />
-
-        {/* 메인 컨텐츠 영역 */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
-          {/* 대화 영역 (축소됨) */}
-          {conversationMessages.length > 0 && (
-            <div className="bg-gray-50 border-b border-gray-200 p-4">
-              <div className="space-y-3 max-h-[150px] overflow-y-auto scrollbar-thin">
-                {conversationMessages.map((message) => (
-                  <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    {message.role === 'assistant' && (
-                      <div className="w-6 h-6 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs font-medium mr-2 flex-shrink-0">
-                        AI
-                      </div>
-                    )}
-                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-base ${
-                      message.role === 'user'
-                        ? 'bg-primary-500 text-white'
-                        : 'bg-white text-gray-900 border border-gray-200'
-                    }`}>
-                      {message.content}
-                    </div>
+                  {/* 로딩 중 스켈레톤 */}
+                  <div className="mt-4">
+                    <JobCardSkeletonList count={3} />
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* 결과 영역 */}
-          <div className="p-4">
-            {/* 검색 조건 요약 */}
-            {lastSearchParams && lastResultMessage && (
-              <SearchSummary
-                searchParams={lastSearchParams}
-                totalCount={lastResultMessage.pagination?.total_count || lastResultMessage.jobs.length}
-              />
             )}
-
-            {/* 채용공고 목록 */}
-            {lastResultMessage && (
-              <JobCardList
-                jobs={lastResultMessage.jobs}
-                pagination={lastResultMessage.pagination}
-                onLoadMore={loadMoreJobs}
-                isLoadingMore={isLoadingMore}
-              />
-            )}
-
-            <div ref={messagesEndRef} />
           </div>
+          <div ref={messagesEndRef} />
         </div>
 
         {/* 입력 영역 */}
         <div className="border-t border-gray-200 p-4 bg-white flex-shrink-0">
-          <p className="text-xs text-gray-400 mb-2 text-center">
-            조건을 바꿔서 다시 검색해보세요
-          </p>
           <InputBox onSend={handleSend} disabled={isLoading} />
         </div>
       </div>

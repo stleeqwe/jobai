@@ -1,14 +1,14 @@
 """
-서울 지하철 기반 통근시간 계산 서비스
+지하철 서비스 래퍼 - V6
 
+서울 지하철 기반 통근시간 계산 서비스
 Google Maps API 대신 공공데이터를 활용하여 비용 없이 통근시간을 계산합니다.
-MapsService와 동일한 인터페이스를 제공합니다.
 
 지원 노선: 1-9호선 + 신분당선
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from app.services.seoul_subway_commute import SeoulSubwayCommute
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class SubwayService:
-    """서울 지하철 기반 통근시간 계산 서비스"""
+    """지하철 통근시간 계산 서비스"""
 
     def __init__(self):
         self._commute: Optional[SeoulSubwayCommute] = None
@@ -63,6 +63,30 @@ class SubwayService:
 
         return self._initialized and self._commute is not None
 
+    def calculate(self, origin: str, destination: str) -> Optional[Dict[str, Any]]:
+        """
+        통근시간 계산
+
+        Args:
+            origin: 출발지 (역명, 주소, "lat,lng")
+            destination: 도착지 (역명, 주소, "lat,lng")
+
+        Returns:
+            {
+                "minutes": int,
+                "text": "약 30분",
+                "origin_station": str,
+                "destination_station": str,
+                "origin_walk": int,
+                "destination_walk": int
+            }
+        """
+        if not self.is_available():
+            logger.warning("SubwayService 사용 불가")
+            return None
+
+        return self._commute.calculate(origin, destination)
+
     async def filter_jobs_by_travel_time(
         self,
         jobs: List[Dict[str, Any]],
@@ -70,9 +94,7 @@ class SubwayService:
         max_minutes: int
     ) -> List[Dict[str, Any]]:
         """
-        통근시간 기준 공고 필터링
-
-        MapsService.filter_jobs_by_travel_time()과 동일한 인터페이스
+        통근시간 기준 공고 필터링 (V4 호환)
 
         Args:
             jobs: 공고 리스트 (location_full 필드 필요)
@@ -101,6 +123,13 @@ class SubwayService:
         logger.info(f"통근시간 필터: {len(jobs)}건 → {len(results)}건 (최대 {max_minutes}분)")
 
         return results
+
+    def filter_jobs(self, jobs: List[Dict], origin: str, max_minutes: int) -> List[Dict]:
+        """공고 필터링 (동기 버전)"""
+        if not self.is_available():
+            return []
+
+        return self._commute.filter_jobs(jobs, origin, max_minutes)
 
     def get_stats(self) -> Dict[str, int]:
         """통계 정보"""

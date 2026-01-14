@@ -23,11 +23,15 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:3000"
 
     # Gemini
-    GEMINI_MODEL: str = "gemini-2.0-flash-lite"
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
 
     # Search
     DEFAULT_SEARCH_LIMIT: int = 10
     MAX_SEARCH_LIMIT: int = 50
+
+    # Feedback Email
+    GMAIL_USER: str = ""
+    GMAIL_APP_PASSWORD: str = ""
 
     @property
     def allowed_origins_list(self) -> list[str]:

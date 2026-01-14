@@ -258,7 +258,7 @@ class SeoulSubwayCommute:
                 from_lat, from_lng, to_lat, to_lng
             )
             minutes = min(direct_walk, from_walk + to_walk)
-            _, text = self._format_commute_time(minutes)
+            rounded, text = self._round_to_10_minutes(minutes)
             return {
                 'minutes': minutes,
                 'text': text,
@@ -274,7 +274,7 @@ class SeoulSubwayCommute:
 
         # 총 시간 = 도보 + 지하철 + 도보 + 대기
         total = from_walk + subway_time + to_walk + self.WAITING_BUFFER
-        _, text = self._format_commute_time(total)
+        rounded, text = self._round_to_10_minutes(total)
 
         return {
             'minutes': total,
@@ -438,9 +438,11 @@ class SeoulSubwayCommute:
         return int(dist / self.WALKING_SPEED_MPM) + 1
 
     @staticmethod
-    def _format_commute_time(minutes: int) -> Tuple[int, str]:
-        """통근 시간 포맷팅 (정확한 분 단위)"""
-        return minutes, f"{minutes}분"
+    def _round_to_10_minutes(minutes: int) -> Tuple[int, str]:
+        """10분 단위 반올림"""
+        rounded = round(minutes / 10) * 10
+        rounded = max(10, rounded)
+        return rounded, f"약 {rounded}분"
 
     # =========================================================================
     # 파싱 유틸리티

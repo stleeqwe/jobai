@@ -1,13 +1,16 @@
 """
-주소 → 좌표 변환 (Geocoding) 모듈
+주소 ↔ 좌표 변환 (Geocoding) 모듈
 
 지하철역 좌표 캐시를 우선 사용하고,
-필요시 외부 API(Kakao 등)를 fallback으로 사용합니다.
+필요시 외부 API(Google Maps)를 fallback으로 사용합니다.
 """
 
 import logging
 import re
+import httpx
 from typing import Dict, Optional, Tuple
+
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +172,84 @@ def extract_gu_from_address(address: str) -> Optional[str]:
     if match:
         return match.group(1) + "구"
     return None
+
+
+async def reverse_geocode(lat: float, lng: float) -> Optional[Dict]:
+    """
+    좌표 → 주소 변환 (역지오코딩)
+
+    Google Maps Geocoding API를 사용하여 좌표를 한국어 주소로 변환합니다.
+
+    Args:
+        lat: 위도
+        lng: 경도
+
+    Returns:
+        {
+            "address": "서울특별시 강남구 역삼동",
+            "gu": "강남구",
+            "dong": "역삼동",
+            "full_address": "대한민국 서울특별시 강남구 역삼동 123-45"
+        }
+        또는 None
+    """
+    if not settings.GOOGLE_MAPS_API_KEY:
+        logger.warning("GOOGLE_MAPS_API_KEY가 설정되지 않음")
+        return None
+
+    try:
+        url = "https://maps.googleapis.com/maps/api/geocode/json"
+        params = {
+            "latlng": f"{lat},{lng}",
+            "key": settings.GOOGLE_MAPS_API_KEY,
+            "language": "ko",
+            "result_type": "sublocality_level_2|sublocality_level_1|locality"
+        }
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url, params=params)
+            data = response.json()
+
+        if data.get("status") != "OK" or not data.get("results"):
+            logger.warning(f"역지오코딩 실패: {data.get('status')}")
+            return None
+
+        result = data["results"][0]
+        formatted_address = result.get("formatted_address", "")
+
+        # address_components에서 구/동 추출
+        gu = None
+        dong = None
+
+        for component in result.get("address_components", []):
+            types = component.get("types", [])
+            name = component.get("long_name", "")
+
+            # 구 (sublocality_level_1)
+            if "sublocality_level_1" in types:
+                gu = name
+            # 동 (sublocality_level_2)
+            elif "sublocality_level_2" in types:
+                dong = name
+
+        # 간단한 주소 생성 (구 + 동)
+        if gu and dong:
+            address = f"{gu} {dong}"
+        elif gu:
+            address = gu
+        elif dong:
+            address = dong
+        else:
+            # fallback: formatted_address에서 추출
+            address = formatted_address.replace("대한민국 ", "").replace("서울특별시 ", "")
+
+        return {
+            "address": address,
+            "gu": gu,
+            "dong": dong,
+            "full_address": formatted_address
+        }
+
+    except Exception as e:
+        logger.exception(f"역지오코딩 오류: {e}")
+        return None

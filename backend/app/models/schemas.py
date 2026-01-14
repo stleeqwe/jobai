@@ -1,7 +1,14 @@
-"""Pydantic 스키마 정의 - V3 (3-Stage Filter + Maps API)"""
+"""Pydantic 스키마 정의 - V6 (Simple Agentic)"""
 
 from pydantic import BaseModel, Field
-from typing import Optional, Any
+from typing import Optional, Any, List
+
+
+class UserLocation(BaseModel):
+    """사용자 위치 정보"""
+    latitude: float = Field(description="위도")
+    longitude: float = Field(description="경도")
+    address: Optional[str] = Field(None, description="역지오코딩된 주소")
 
 
 class ChatRequest(BaseModel):
@@ -16,25 +23,9 @@ class ChatRequest(BaseModel):
         None,
         description="대화 ID (연속 대화용)"
     )
-    page: int = Field(
-        default=1,
-        ge=1,
-        description="페이지 번호 (기본 1)"
-    )
-    page_size: int = Field(
-        default=20,
-        ge=1,
-        le=100,
-        description="페이지당 결과 수 (기본 20, 최대 100)"
-    )
-    # 사용자 GPS 좌표 (Geolocation API)
-    user_lat: Optional[float] = Field(
+    user_location: Optional[UserLocation] = Field(
         None,
-        description="사용자 위도"
-    )
-    user_lng: Optional[float] = Field(
-        None,
-        description="사용자 경도"
+        description="사용자 현재 위치 (브라우저 geolocation)"
     )
 
 
@@ -44,82 +35,69 @@ class JobItem(BaseModel):
     company_name: str
     title: str
     location: str
-    salary: str
-    experience: str
-    employment_type: str
-    deadline: str
-    url: str
-    # V3: Maps API 이동시간 정보
-    travel_time_minutes: Optional[int] = Field(
+    salary_text: str = Field(alias="salary", default="협의")
+    experience_type: str = Field(alias="experience", default="")
+    employment_type: str = ""
+    deadline: str = ""
+    url: str = ""
+    # V6: 통근시간 정보
+    commute_minutes: Optional[int] = Field(
         default=None,
-        description="예상 이동시간 (분)"
+        description="예상 통근시간 (분)"
     )
-    travel_time_text: Optional[str] = Field(
+    commute_text: Optional[str] = Field(
         default=None,
-        description="이동시간 텍스트 (예: '15분')"
+        description="통근시간 텍스트 (예: '약 30분')"
     )
+
+    class Config:
+        populate_by_name = True
 
 
 class PaginationInfo(BaseModel):
-    """페이지네이션 정보"""
-    page: int = Field(description="현재 페이지 번호")
-    page_size: int = Field(description="페이지당 결과 수")
+    """페이지네이션 정보 - V6"""
     total_count: int = Field(description="총 결과 수")
-    total_pages: int = Field(description="총 페이지 수")
-    has_next: bool = Field(description="다음 페이지 존재 여부")
-    has_prev: bool = Field(description="이전 페이지 존재 여부")
+    displayed: int = Field(default=0, description="표시된 결과 수")
+    has_more: bool = Field(default=False, description="더보기 가능 여부")
+    remaining: int = Field(default=0, description="남은 결과 수")
 
 
 class ChatResponse(BaseModel):
-    """채팅 응답 모델 - V3 (3-Stage Filter)"""
+    """채팅 응답 모델 - V6"""
     success: bool
     response: str
-    jobs: list[JobItem]
-    pagination: PaginationInfo
+    jobs: List[JobItem]
+    pagination: Optional[PaginationInfo] = None
     search_params: dict[str, Any] = Field(
         default_factory=dict,
-        description="V3 검색 파라미터 (job_type, salary_min, user_location, max_commute_minutes)"
+        description="검색 파라미터 (job_keywords, salary_min, commute_origin 등)"
     )
-    conversation_id: str
+    conversation_id: str = ""
     error: Optional[str] = None
 
-    # 하위 호환성을 위한 total_count (deprecated)
-    @property
-    def total_count(self) -> int:
-        return self.pagination.total_count
 
-
-class LoadMoreRequest(BaseModel):
-    """더 보기 요청 모델 (캐시 기반 페이지네이션)"""
+class MoreResultsRequest(BaseModel):
+    """더보기 요청 모델"""
     conversation_id: str = Field(
         ...,
         description="대화 ID"
     )
-    page: int = Field(
-        default=1,
-        ge=1,
-        description="페이지 번호"
-    )
-    page_size: int = Field(
-        default=20,
-        ge=1,
-        le=100,
-        description="페이지당 결과 수"
-    )
 
 
-class LoadMoreResponse(BaseModel):
-    """더 보기 응답 모델"""
+class MoreResultsResponse(BaseModel):
+    """더보기 응답 모델"""
     success: bool
-    jobs: list[JobItem]
-    pagination: PaginationInfo
-    search_params: dict[str, Any] = Field(default_factory=dict)
+    response: str = ""
+    jobs: List[JobItem]
+    pagination: Optional[PaginationInfo] = None
+    has_more: bool = False
 
 
 class HealthResponse(BaseModel):
     """헬스체크 응답"""
     status: str
     version: str
+    environment: str
     services: dict[str, str]
 
 
@@ -128,3 +106,20 @@ class StatsResponse(BaseModel):
     total_jobs: int
     active_jobs: int
     last_crawl: Optional[str]
+
+
+# ========== V4 하위 호환성 ==========
+
+class LoadMoreRequest(BaseModel):
+    """[V4 호환] 더 보기 요청 모델"""
+    conversation_id: str
+    page: int = 1
+    page_size: int = 20
+
+
+class LoadMoreResponse(BaseModel):
+    """[V4 호환] 더 보기 응답 모델"""
+    success: bool
+    jobs: List[JobItem]
+    pagination: Optional[PaginationInfo] = None
+    search_params: dict[str, Any] = Field(default_factory=dict)

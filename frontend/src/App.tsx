@@ -1,17 +1,102 @@
+import { useState } from 'react'
 import { ChatWindow } from './components/ChatWindow'
 
 function App() {
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackText, setFeedbackText] = useState('')
+
+  const [isSending, setIsSending] = useState(false)
+
+  const handleSendFeedback = async () => {
+    if (!feedbackText.trim() || isSending) return
+    setIsSending(true)
+    try {
+      const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: 'service_6qol534',
+          template_id: 'template_3ulikof',
+          user_id: 'a68AfNe8lYyVkne3h',
+          template_params: {
+            name: 'JOBBOT 사용자',
+            email: 'anonymous@jobbot.com',
+            message: feedbackText
+          }
+        })
+      })
+      if (res.ok) {
+        alert('피드백이 전송되었습니다. 감사합니다!')
+        setShowFeedback(false)
+        setFeedbackText('')
+      } else {
+        alert('전송에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      }
+    } catch {
+      alert('전송에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-100 to-primary-50 flex flex-col">
       {/* 메인 */}
-      <main className="flex-1 max-w-4xl w-full mx-auto pt-12 sm:pt-20 pb-4 px-4">
+      <main className="flex-1 max-w-4xl w-full mx-auto py-12 sm:py-20 px-4">
         <ChatWindow />
       </main>
 
       {/* 푸터 */}
-      <footer className="py-4 px-4 text-center text-xs text-gray-400">
+      <footer className="py-4 px-4 text-center text-xs text-gray-400 space-y-1">
+        <p>
+          <span className="font-medium text-gray-500">Beta Version</span>
+          <span className="mx-2">·</span>
+          서울시 내 채용공고 (개발, 디자인, 마케팅, 기획, 경영지원)
+        </p>
         <p>채용공고 정보는 잡코리아에서 제공됩니다.</p>
       </footer>
+
+      {/* 피드백 버튼 - 우측 하단 고정 */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        className="fixed bottom-6 right-6 bg-gray-700 hover:bg-gray-800 text-white text-sm px-4 py-2 rounded-full shadow-lg transition-colors"
+      >
+        개발자에게 쓴소리하기
+      </button>
+
+      {/* 피드백 모달 */}
+      {showFeedback && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">개발자에게 쓴소리하기</h3>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="불편한 점, 개선 아이디어, 버그 제보 등 자유롭게 작성해주세요"
+              rows={5}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowFeedback(false)
+                  setFeedbackText('')
+                }}
+                className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSendFeedback}
+                disabled={!feedbackText.trim() || isSending}
+                className="flex-1 py-2 text-sm text-white bg-primary-500 hover:bg-primary-600 disabled:bg-gray-300 rounded-lg transition-colors"
+              >
+                {isSending ? '전송 중...' : '보내기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

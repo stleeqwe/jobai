@@ -10,6 +10,31 @@ import httpx
 
 from app.config import settings
 from app.normalizers import normalize_job_type, get_job_category, get_mvp_category, normalize_location, parse_salary
+from app.normalizers.company import CompanyNormalizer, normalize_company
+from app.normalizers.dedup import DedupKeyGenerator, generate_dedup_key
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.seoul_subway_commute import SeoulSubwayCommute
+
+# 지하철 모듈 Lazy 초기화 (상세 페이지 크롤링 시에만 로드)
+_subway_module: "SeoulSubwayCommute | None" = None
+
+
+def _get_subway_module() -> "SeoulSubwayCommute | None":
+    """지하철 통근 모듈 Lazy 로드"""
+    global _subway_module
+    if _subway_module is None:
+        try:
+            from app.services.seoul_subway_commute import SeoulSubwayCommute
+            _subway_module = SeoulSubwayCommute()
+            if not _subway_module.is_initialized():
+                _subway_module = None
+        except Exception as e:
+            if settings.DEBUG:
+                print(f"[Crawler] 지하철 모듈 로드 실패: {e}")
+            _subway_module = None
+    return _subway_module
 
 
 # User-Agent 로테이션 풀
@@ -86,15 +111,19 @@ class JobKoreaScraper:
         "용산구": "I210", "은평구": "I220", "종로구": "I230", "중구": "I240", "중랑구": "I250",
     }
 
-    def __init__(self, num_workers: int = 3):
+    def __init__(self, num_workers: int = 1):
         """
         Args:
-            num_workers: 병렬 워커 수 (기본 3, 최대 5 권장)
+            num_workers: 병렬 워커 수 (기본 1, 최대 3 권장 - 차단 방지)
         """
-        self.num_workers = min(num_workers, 5)  # 최대 5개로 제한
+        self.num_workers = min(num_workers, 3)  # 최대 3개로 제한 (차단 방지)
         self.stats = CrawlerStats()
         self.clients: List[httpx.AsyncClient] = []
         self._setup_clients()
+
+        # Phase 1: Normalizer 인스턴스
+        self.company_normalizer = CompanyNormalizer()
+        self.dedup_generator = DedupKeyGenerator()
 
     def _setup_clients(self):
         """워커별 HTTP 클라이언트 설정 (각각 다른 User-Agent)"""
@@ -242,17 +271,16 @@ class JobKoreaScraper:
 
     async def _crawl_page_with_client(
         self, client: httpx.AsyncClient, page: int, worker_id: int,
-        fetch_details: bool = True, parallel_batch_size: int = 10
+        parallel_batch_size: int = 3
     ) -> Optional[List[Dict]]:
         """
-        특정 클라이언트로 페이지 크롤링 (상세 페이지 병렬 호출 지원)
+        특정 클라이언트로 페이지 크롤링 (상세 페이지 병렬 호출)
 
         Args:
             client: HTTP 클라이언트
             page: 페이지 번호
             worker_id: 워커 ID
-            fetch_details: 상세 페이지 호출 여부
-            parallel_batch_size: 병렬 호출 배치 크기 (기본 5)
+            parallel_batch_size: 병렬 호출 배치 크기 (기본 3 - 차단 방지)
         """
         params = {
             "menucode": "local",
@@ -291,9 +319,6 @@ class JobKoreaScraper:
                     print(f"[Worker-{worker_id}] 아이템 파싱 실패: {e}")
                 continue
 
-        if not fetch_details:
-            return parsed_jobs
-
         # 2단계: 상세 페이지 병렬 호출 (배치 단위)
         async def fetch_detail_with_delay(job: Dict, batch_idx: int) -> Dict:
             """상세 정보 가져오기 (배치 내 딜레이 적용)"""
@@ -323,9 +348,9 @@ class JobKoreaScraper:
                 if isinstance(result, dict):
                     jobs.append(result)
 
-            # 배치 간 딜레이 (차단 방지) - 최적화: 0.3~0.5초
+            # 배치 간 딜레이 (차단 방지)
             if batch_start + parallel_batch_size < len(parsed_jobs):
-                await asyncio.sleep(0.3 + random.uniform(0.1, 0.2))
+                await asyncio.sleep(1.0 + random.uniform(0.5, 1.0))  # 1.0~2.0초
 
         return jobs
 
@@ -657,6 +682,21 @@ class JobKoreaScraper:
             # 주소에서 location 정보 추출
             location_info = normalize_location(company_address) if company_address else {}
 
+            # 12. 가장 가까운 지하철역 계산 (V6 신규)
+            nearest_station = ""
+            station_walk_minutes = None
+            if company_address:
+                subway = _get_subway_module()
+                if subway:
+                    coords = subway._parse_location(company_address)
+                    if coords:
+                        lat, lng = coords
+                        station_id, walk_minutes = subway._find_nearest_station(lat, lng)
+                        if station_id:
+                            station_info = subway.stations.get(station_id, {})
+                            nearest_station = station_info.get("name", "")
+                            station_walk_minutes = walk_minutes
+
             return {
                 "job_type": normalized or primary_job_type,
                 "job_type_raw": ", ".join(job_types[:3]),
@@ -668,6 +708,7 @@ class JobKoreaScraper:
                 "salary_min": salary_data["min"],
                 "salary_max": salary_data["max"],
                 "salary_type": salary_data["type"],
+                "salary_source": salary_data.get("source", "parsed"),  # Phase 1: 급여 출처
                 "company_address": company_address,
                 "company_size": company_size,
                 "benefits": benefits,
@@ -677,6 +718,9 @@ class JobKoreaScraper:
                 "location_sido": location_info.get("sido", ""),
                 "location_gugun": location_info.get("gugun", ""),
                 "location_dong": location_info.get("dong", ""),
+                # V6: 가장 가까운 지하철역
+                "nearest_station": nearest_station,
+                "station_walk_minutes": station_walk_minutes,
                 **deadline_info,
             }
 
@@ -800,6 +844,9 @@ class JobKoreaScraper:
         location_info = normalize_location(location_raw)
         experience_type, experience_min, experience_max = self._parse_experience(experience_raw)
 
+        # Phase 1: 회사명 정규화
+        company_name_normalized, company_type = self.company_normalizer.normalize(company_name)
+
         # URL 생성
         if href.startswith("http"):
             url = href
@@ -810,10 +857,13 @@ class JobKoreaScraper:
 
         now = datetime.now()
 
-        return {
+        # 기본 데이터 구성
+        job_data = {
             "id": f"jk_{job_id}",
             "source": "jobkorea",
-            "company_name": company_name,
+            "company_name_raw": company_name,           # Phase 1: 원본 회사명
+            "company_name": company_name_normalized,    # Phase 1: 정규화된 회사명
+            "company_type": company_type,               # Phase 1: 법인유형 (stock/limited/partnership/None)
             "title": title,
             "url": url,
             "job_type": "",
@@ -834,6 +884,7 @@ class JobKoreaScraper:
             "salary_min": None,
             "salary_max": None,
             "salary_type": None,
+            "salary_source": "unknown",                 # Phase 1: 급여 출처 (상세에서 업데이트)
             "deadline": deadline,
             "deadline_type": "date" if deadline else "ongoing",
             "deadline_date": None,
@@ -842,6 +893,11 @@ class JobKoreaScraper:
             "updated_at": now,
             "last_verified": now,
         }
+
+        # Phase 1: 중복 제거용 키 생성
+        job_data["dedup_key"] = self.dedup_generator.generate(job_data)
+
+        return job_data
 
     def _parse_experience(self, text: str) -> tuple:
         """경력 텍스트 파싱"""

@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import { ChatResponse, Coordinates, LoadMoreResponse } from '../types'
+import { ChatResponse, LoadMoreResponse } from '../types'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -8,34 +8,46 @@ const client = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 60000  // 2-Stage 처리로 인해 타임아웃 증가
+  timeout: 60000  // Simple Agentic 처리 타임아웃
 })
 
+// 사용자 위치 정보
+export interface UserLocation {
+  latitude: number
+  longitude: number
+  address: string | null
+}
+
+// V6: 요청 파라미터 (위치 정보 포함)
 export interface ChatRequestParams {
   message: string
   conversationId: string | null
-  page?: number
-  pageSize?: number
-  userCoordinates?: Coordinates | null  // 사용자 GPS 좌표
+  userLocation?: UserLocation | null
 }
 
 export interface LoadMoreParams {
   conversationId: string
-  page: number
-  pageSize?: number
 }
 
 export const chatApi = {
+  // V6: 채팅 API (위치 정보 포함)
   send: async (params: ChatRequestParams): Promise<ChatResponse> => {
     try {
-      const response = await client.post<ChatResponse>('/chat', {
+      const requestBody: Record<string, unknown> = {
         message: params.message,
-        conversation_id: params.conversationId,
-        page: params.page || 1,
-        page_size: params.pageSize || 20,
-        user_lat: params.userCoordinates?.latitude,
-        user_lng: params.userCoordinates?.longitude
-      })
+        conversation_id: params.conversationId
+      }
+
+      // 위치 정보가 있으면 추가
+      if (params.userLocation) {
+        requestBody.user_location = {
+          latitude: params.userLocation.latitude,
+          longitude: params.userLocation.longitude,
+          address: params.userLocation.address
+        }
+      }
+
+      const response = await client.post<ChatResponse>('/chat', requestBody)
       return response.data
     } catch (error) {
       const axiosError = error as AxiosError<{ detail: string }>
@@ -46,13 +58,11 @@ export const chatApi = {
     }
   },
 
-  // 캐시된 결과에서 추가 페이지 로드 (AI 재호출 없음)
+  // V6: 캐시된 결과에서 추가 로드 (AI 호출 없음)
   loadMore: async (params: LoadMoreParams): Promise<LoadMoreResponse> => {
     try {
       const response = await client.post<LoadMoreResponse>('/chat/more', {
-        conversation_id: params.conversationId,
-        page: params.page,
-        page_size: params.pageSize || 20
+        conversation_id: params.conversationId
       })
       return response.data
     } catch (error) {

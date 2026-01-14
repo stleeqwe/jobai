@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef } from 'react'
-import { Message, Job, PaginationInfo, Coordinates } from '../types'
-import { chatApi } from '../services/api'
+import { Message, Job, PaginationInfo } from '../types'
+import { chatApi, UserLocation } from '../services/api'
 
+// V6: 검색 파라미터 (Simple Agentic)
 interface SearchParams {
-  job_type?: string
+  job_keywords?: string[]
   salary_min?: number
-  location_query?: string
-  max_commute_minutes?: number
+  commute_origin?: string
+  commute_max_minutes?: number
 }
 
 const INITIAL_MESSAGE: Message = {
@@ -19,14 +20,14 @@ const INITIAL_MESSAGE: Message = {
 
 interface SearchContext {
   message: string
-  pagination: PaginationInfo
+  pagination: PaginationInfo | null
   allJobs: Job[]
-  userCoordinates?: Coordinates | null
   searchParams?: SearchParams
 }
 
+// V6: 위치 정보 포함 옵션
 interface UseChatOptions {
-  userCoordinates?: Coordinates | null
+  userLocation?: UserLocation | null
 }
 
 export function useChat(options: UseChatOptions = {}) {
@@ -40,9 +41,8 @@ export function useChat(options: UseChatOptions = {}) {
   // 현재 검색 컨텍스트 저장 (더 보기용)
   const searchContextRef = useRef<SearchContext | null>(null)
 
-  const sendMessage = useCallback(async (content: string, coordinates?: Coordinates | null) => {
-    // 좌표는 파라미터로 받은 것 우선, 없으면 옵션에서
-    const userCoordinates = coordinates ?? options.userCoordinates
+  // V6: 위치 정보 포함하여 전송
+  const sendMessage = useCallback(async (content: string, locationOverride?: UserLocation | null) => {
     // 사용자 메시지 추가
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -56,21 +56,22 @@ export function useChat(options: UseChatOptions = {}) {
     setIsLoading(true)
     setError(null)
 
+    // 위치 정보: override가 있으면 사용, 없으면 options에서 가져옴
+    const userLocation = locationOverride !== undefined ? locationOverride : options.userLocation
+
     try {
       const response = await chatApi.send({
         message: content,
         conversationId,
-        page: 1,
-        pageSize: 20,
-        userCoordinates
+        userLocation
       })
 
-      // 검색 파라미터 저장
+      // V6: 검색 파라미터 저장
       const searchParams: SearchParams = {
-        job_type: response.search_params?.job_type as string,
+        job_keywords: response.search_params?.job_keywords as string[],
         salary_min: response.search_params?.salary_min as number,
-        location_query: response.search_params?.location_query as string,
-        max_commute_minutes: response.search_params?.max_commute_minutes as number
+        commute_origin: response.search_params?.commute_origin as string,
+        commute_max_minutes: response.search_params?.commute_max_minutes as number
       }
       setLastSearchParams(searchParams)
 
@@ -79,7 +80,6 @@ export function useChat(options: UseChatOptions = {}) {
         message: content,
         pagination: response.pagination,
         allJobs: response.jobs,
-        userCoordinates,
         searchParams
       }
 
@@ -112,21 +112,19 @@ export function useChat(options: UseChatOptions = {}) {
     } finally {
       setIsLoading(false)
     }
-  }, [conversationId, options.userCoordinates])
+  }, [conversationId, options.userLocation])
 
+  // V6: 더보기 (캐시 기반, AI 호출 없음)
   const loadMoreJobs = useCallback(async () => {
     const context = searchContextRef.current
-    if (!context || !context.pagination.has_next || !conversationId) return
+    if (!context || !context.pagination?.has_more || !conversationId) return
 
     setIsLoadingMore(true)
 
     try {
-      const nextPage = context.pagination.page + 1
-      // 캐시 기반 API 사용 (AI 재호출 없음)
+      // V6: 단순히 conversation_id만 전달
       const response = await chatApi.loadMore({
-        conversationId,
-        page: nextPage,
-        pageSize: 20
+        conversationId
       })
 
       // 새 공고들을 기존에 추가
@@ -148,7 +146,7 @@ export function useChat(options: UseChatOptions = {}) {
             newMessages[i] = {
               ...newMessages[i],
               jobs: newAllJobs,
-              pagination: response.pagination
+              pagination: response.pagination ?? undefined
             }
             break
           }

@@ -2,9 +2,11 @@
 
 ## MVP 범위 정의
 
-### 지역 범위
-- **서울 전체** (25개 구)
+### 지역 범위 (중요!)
+- **서울시 한정** (25개 구만 수집)
 - 크롤러 설정: `TARGET_LOCAL_CODE = "I000"` (서울 전체)
+- **서울 외 지역 데이터는 저장하지 않음** (경기, 인천, 부산 등 모두 제외)
+- 크롤링 시 `location_sido`가 "서울"이 아닌 공고는 필터링
 
 ### 직무 범위
 | 카테고리 | 포함 직무 |
@@ -15,9 +17,9 @@
 | **기획** | 서비스기획, PM, 사업기획, 전략기획 등 |
 | **경영지원** | 인사, 총무, 재무회계, 법무, 비서 등 |
 
-### MVP 제외 범위
-- 지역: 서울 외 지역 (경기, 인천 등)
-- 직무: 영업, 서비스, 의료, 교육, 연구개발 등
+### MVP 제외 범위 (수집하지 않음)
+- **지역**: 서울 외 모든 지역 (경기, 인천, 부산, 대구, 광주, 대전, 울산, 세종, 강원, 충북, 충남, 전북, 전남, 경북, 경남, 제주)
+- **직무**: 영업, 서비스, 의료, 교육, 연구개발 등
 
 ---
 
@@ -65,19 +67,12 @@ job_id = parts[0] if parts and parts[0].isdigit() else None
 - 상세 페이지 파싱 시간
 - Firestore 저장 시간
 
-**현재 해결책**: `fetch_details` 파라미터 추가
-```python
-# 빠른 크롤링 (상세 정보 없이)
-jobs = await scraper._crawl_page_with_client(client, page, 0, fetch_details=False)
-
-# 상세 정보 포함 (느림)
-jobs = await scraper._crawl_page_with_client(client, page, 0, fetch_details=True)
-```
-
-**향후 최적화 방안**:
-- 상세 페이지 병렬 호출 (asyncio.gather)
-- 딜레이 시간 조정 (현재 0.3~0.6초)
-- 배치 크기 최적화
+**현재 해결책**: 상세 페이지 병렬 호출 (asyncio.gather) + 차단 방지 설정
+- 워커 수: 1개 (기본값, 최대 3개)
+- 배치 크기: 3개 (parallel_batch_size)
+- 배치 간 딜레이: 1.0~2.0초
+- 초당 요청: ~2개 (안전 범위)
+- 예상 속도: 1,000건당 약 30~40분
 
 ---
 
@@ -217,83 +212,109 @@ stats = await get_job_stats()
 
 ---
 
-## 아키텍처 V4 (3-Stage Sequential Filter with Subway)
+## 아키텍처 V6 (Simple Agentic)
 
-### V3의 한계
+### V4의 한계
 
 | 문제 | 원인 |
 |------|------|
-| Maps API 비용 | $1.25/검색으로 비용 부담 |
-| 위치 파싱 AI 호출 | 불필요한 AI 호출로 지연 발생 |
-| 복수 출발지 처리 | 복잡한 로직으로 유지보수 어려움 |
+| Function Call 강제 | 항상 파라미터 추출 → 정보 부족해도 검색 실행 |
+| 3-Stage 고정 파이프라인 | 유연한 대화 흐름 불가 |
+| AI 의미 매칭 불필요 | DB 검색으로 충분 |
 
-### V4 핵심 원칙
-
-```
-1. 필수 정보 수집: 직무 + 연봉 (지역은 선택)
-2. 직무 우선 필터: AI가 의미적으로 직무 매칭 (Stage 1)
-3. 연봉 유연 필터: 회사내규/협상가능 포함 (Stage 2)
-4. 지하철 기반 거리 계산: AI 호출 없이 규칙 기반 (Stage 3)
-   - location_query를 그대로 SeoulSubwayCommute에 전달
-   - 역명/구/동 → 좌표 변환은 모듈 내부에서 처리
-```
-
-### 3-Stage 흐름
+### V6 핵심 원칙
 
 ```
-[Phase 0: Function Call로 파라미터 추출]
-"을지로역 부근 웹 디자이너 연봉 4천"
+1. LLM = 자율적 판단자 (파라미터 추출기 X)
+2. 필수 정보 3가지: 직무, 연봉, 통근 기준점
+3. 정보 부족 → 질문 / 정보 충분 → search_jobs 호출
+4. 검색 결과 → LLM에게 직접 전달 (50건)
+5. 통근시간: 지하철 기반 계산 ($0)
+```
+
+### Simple Agentic 흐름
+
+```
+사용자: "을지로역 부근 웹 디자이너 연봉 4천"
         │
-        ▼ Gemini AI (1회 호출)
-{job_type: "웹 디자이너", salary_min: 4000, location_query: "을지로역"}
+        ▼ Gemini 2.0 Flash
+[LLM 자율 판단: 필수 정보 3가지 충족?]
         │
-        ▼
-[Stage 1: 직무 필터 - AI]
-전체 공고 → AI가 의미적 매칭 → ~20건
-        │
-        ▼
-[Stage 2: 연봉 필터 - DB]
-salary_min >= 요청값 OR 회사내규 → ~15건
-        │
-        ▼
-[Stage 3: 거리 필터 - 지하철 기반 (AI 호출 없음)]
-subway_service.filter_jobs_by_travel_time(
-    jobs=stage2_jobs,
-    origin="을지로역",    ← location_query 그대로 전달
-    max_minutes=60
-)
-        │
-        ▼ SeoulSubwayCommute._parse_location() (규칙 기반)
-"을지로역" → 을지로입구역 좌표 → Dijkstra → 통근시간 계산
-        │
-        ▼
-[결과 반환]
-이동시간순 정렬 + 페이지네이션
+    ┌───┴───┐
+    │ Yes   │ No
+    ▼       ▼
+search_jobs()  "어떤 직무를 찾으시나요?"
+    │
+    ▼
+[job_search.search_jobs_with_commute()]
+  1. DB 키워드 필터 (job_keywords)
+  2. 연봉 필터 (salary_min)
+  3. 통근시간 계산 (commute_origin → subway)
+    │
+    ▼
+[검색 결과 50건 → LLM 전달]
+    │
+    ▼ LLM이 자연어 응답 생성
+"을지로역 기준 통근 1시간 이내 웹 디자이너
+ 공고 23건을 찾았습니다. 연봉 4천만원 이상..."
 ```
 
 ### 구현 파일
 
 | 파일 | 역할 |
 |------|------|
-| `docs/SUBWAY_COMMUTE_MODULE.md` | 지하철 통근시간 모듈 상세 문서 |
-| `crawler/CRAWLER.md` | 크롤러 유지보수 가이드 |
-| `backend/app/services/gemini.py` | Function Call + 3-Stage 파이프라인 |
-| `backend/app/services/job_search.py` | Stage 2 연봉 필터 |
-| `backend/app/services/subway.py` | Stage 3 지하철 서비스 래퍼 |
-| `backend/app/services/seoul_subway_commute.py` | 지하철 통근시간 계산 핵심 모듈 |
+| `backend/app/services/gemini.py` | Simple Agentic LLM 서비스 (Function Calling) |
+| `backend/app/services/job_search.py` | DB 검색 + 통근시간 계산 |
+| `backend/app/services/subway.py` | 지하철 서비스 래퍼 |
+| `backend/app/services/seoul_subway_commute.py` | 지하철 통근시간 핵심 모듈 |
+| `crawler/app/scrapers/jobkorea.py` | 크롤러 (nearest_station 필드 추가) |
+| `scripts/migrate_nearest_station.py` | 기존 데이터 마이그레이션 |
+
+### API 변경사항
+
+**POST /chat**
+```json
+// 요청 (V6 간소화)
+{"message": "강남역 부근 백엔드 연봉 5천", "conversation_id": null}
+
+// 응답
+{
+  "success": true,
+  "response": "강남역 기준 통근 1시간 이내...",
+  "jobs": [...],
+  "pagination": {"total_count": 23, "displayed": 20, "has_more": true, "remaining": 3},
+  "search_params": {"job_keywords": ["백엔드"], "salary_min": 5000, "commute_origin": "강남역"},
+  "conversation_id": "uuid"
+}
+```
+
+**POST /chat/more** (더보기)
+```json
+// 요청
+{"conversation_id": "uuid"}
+
+// 응답
+{"success": true, "jobs": [...], "pagination": {...}, "has_more": false}
+```
 
 ### 비용 비교
 
-| 항목 | V3 (Maps API) | V4 (Subway) |
-|------|---------------|-------------|
-| API 비용 | $1.25/검색 | **$0** |
-| AI 호출 | 2회 (Function Call + 위치 파싱) | **1회** (Function Call만) |
-| 지연시간 | ~3초 | **~1초** |
+| 항목 | V4 | V6 |
+|------|-----|-----|
+| API 비용 | $0 | **$0** |
+| AI 호출 | 1회 (Function Call 강제) | **1회** (자율적 판단) |
+| 유연성 | 고정 파이프라인 | **대화형 흐름** |
+| 월 예상 비용 | ~$15 | **~$9** |
 
 ---
 
 ## 변경 이력
 
+- **2026-01-13**: 아키텍처 V6 (Simple Agentic) 전환
+  - gemini.py: LLM 자율 판단 로직 구현
+  - job_search.py: 통근시간 기반 검색
+  - 크롤러: nearest_station 필드 추가
+  - 프론트엔드: 더보기 버튼, API 호출 간소화
 - **2026-01-13**: 크롤러 `location_full` 필드 누락 수정, 기존 데이터 마이그레이션 (649건)
 - **2026-01-13**: 아키텍처 V4 (지하철 기반, AI 위치 파싱 제거)
 - **2026-01-13**: 아키텍처 V3 설계 (3-Stage Sequential Filter with Maps API)

@@ -1,8 +1,9 @@
+// V6: Simple Agentic 검색 파라미터
 interface SearchParams {
-  job_type?: string
+  job_keywords?: string[]
   salary_min?: number
-  location_query?: string
-  max_commute_minutes?: number
+  commute_origin?: string
+  commute_max_minutes?: number
 }
 
 interface Props {
@@ -11,10 +12,10 @@ interface Props {
 }
 
 export function SearchSummary({ searchParams, totalCount }: Props) {
-  const { job_type, salary_min, location_query, max_commute_minutes } = searchParams
+  const { job_keywords, salary_min, commute_origin, commute_max_minutes } = searchParams
 
   // 검색 조건이 없으면 표시하지 않음
-  if (!job_type && !salary_min && !location_query) {
+  if (!job_keywords?.length && !salary_min && !commute_origin) {
     return null
   }
 
@@ -26,26 +27,26 @@ export function SearchSummary({ searchParams, totalCount }: Props) {
       </div>
 
       <div className="space-y-2 text-base">
-        {job_type && (
+        {job_keywords && job_keywords.length > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-gray-500 w-16">직무</span>
-            <span className="text-gray-900 font-medium">{job_type}</span>
+            <span className="text-gray-900 font-medium">{job_keywords.join(', ')}</span>
           </div>
         )}
 
-        {salary_min && (
+        {salary_min != null && salary_min > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-gray-500 w-16">연봉</span>
             <span className="text-gray-900 font-medium">{salary_min.toLocaleString()}만원 이상</span>
           </div>
         )}
 
-        {location_query && (
+        {commute_origin && (
           <div className="flex items-center gap-3">
-            <span className="text-gray-500 w-16">위치</span>
+            <span className="text-gray-500 w-16">출발지</span>
             <span className="text-gray-900 font-medium">
-              {location_query}
-              {max_commute_minutes && ` ${max_commute_minutes}분 이내`}
+              {commute_origin}
+              {commute_max_minutes && ` (${commute_max_minutes}분 이내)`}
             </span>
           </div>
         )}

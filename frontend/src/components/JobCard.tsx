@@ -44,7 +44,8 @@ function calculateDday(deadline: string): string | null {
 
 export function JobCard({ job, index }: Props) {
   const dday = calculateDday(job.deadline)
-  const hasTravelTime = job.travel_time_minutes !== undefined
+  // V6: commute_minutes가 실제로 값이 있을 때만 표시 (null, undefined, 0 제외)
+  const hasCommuteTime = job.commute_minutes != null && job.commute_minutes > 0
 
   return (
     <a
@@ -53,16 +54,14 @@ export function JobCard({ job, index }: Props) {
       rel="noopener noreferrer"
       className="block bg-white border border-gray-200 rounded-xl p-5 hover:shadow-lg hover:border-primary-300 transition-all duration-200 group"
     >
-      {/* 상단: 핵심 정보 (이동시간 & 연봉) */}
+      {/* 상단: 연봉 (통근시간은 있을 때만 표시) */}
       <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          {hasTravelTime ? (
+          {hasCommuteTime && (
             <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-base font-medium">
               <span>🚇</span>
-              {job.travel_time_text || `${job.travel_time_minutes}분`}
+              {job.commute_text || `${job.commute_minutes}분`}
             </span>
-          ) : (
-            <span className="text-sm text-gray-400 px-2">이동시간 정보 없음</span>
           )}
         </div>
         <span className="text-primary-600 font-semibold text-base">
