@@ -222,11 +222,19 @@ class JobKoreaScraper:
                     break
 
                 try:
+                    prev_skip_count = self.stats.total_skipped
                     jobs = await self._crawl_page_with_client(client, page, worker_id)
 
                     if jobs is None:  # 더 이상 공고 없음
                         print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 모든 워커 종료", flush=True)
                         no_more_jobs = True  # 다른 워커들도 종료하도록
+                        break
+
+                    # 페이지 단위 조기 중단: 빈 리스트 + 스킵 증가 = 전부 30일 이전
+                    page_skip_count = self.stats.total_skipped - prev_skip_count
+                    if len(jobs) == 0 and page_skip_count > 10:
+                        print(f"[Worker-{worker_id}] 페이지 {page}: 30일 이전 공고만 {page_skip_count}건, 조기 종료", flush=True)
+                        no_more_jobs = True
                         break
 
                     local_jobs.extend(jobs)
@@ -388,8 +396,9 @@ class JobKoreaScraper:
         client = self.clients[0]
         all_jobs = []
         page = 1
+        cutoff_date = datetime.now() - timedelta(days=CrawlerStats.MAX_JOB_AGE_DAYS)
 
-        print(f"[Crawler] 최신 공고 {count}건 수집 시작")
+        print(f"[Crawler] 최신 공고 {count}건 수집 시작 (30일 이내)")
 
         while len(all_jobs) < count:
             try:
@@ -418,8 +427,12 @@ class JobKoreaScraper:
                         job = self._parse_job_item(item)
                         if job and job.get("id"):
                             job_id = job["id"].replace("jk_", "")
-                            detail_info = await self._fetch_detail_info(client, job_id)
+                            detail_info = await self._fetch_detail_info(client, job_id, cutoff_date)
                             if detail_info:
+                                # 30일 이전 공고 스킵
+                                if detail_info.get("_skip"):
+                                    self.stats.record_skip()
+                                    continue
                                 job.update(detail_info)
                             all_jobs.append(job)
                             await asyncio.sleep(0.3)
