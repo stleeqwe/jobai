@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 export interface Coordinates {
   latitude: number
   longitude: number
@@ -28,7 +30,7 @@ export function useGeolocation() {
   const reverseGeocode = useCallback(async (coords: Coordinates): Promise<string | null> => {
     try {
       const response = await fetch(
-        `http://localhost:8000/geocode/reverse?lat=${coords.latitude}&lng=${coords.longitude}`
+        `${API_BASE}/geocode/reverse?lat=${coords.latitude}&lng=${coords.longitude}`
       )
       if (response.ok) {
         const data = await response.json()

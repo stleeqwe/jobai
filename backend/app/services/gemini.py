@@ -115,15 +115,15 @@ class ConversationMemory:
 
     def __init__(self, conversation_id: str):
         self.conversation_id = conversation_id
-        self.last_search_results: List[JobDict] = []  # 최대 100건 저장
+        self.last_search_results: List[JobDict] = []  # 최대 200건 저장
         self.last_search_params: SearchParamsDict = {}
         self.displayed_count: int = 0  # 이미 보여준 개수
         self.history: List[types.Content] = []  # 대화 히스토리
         self.user_location: Optional[UserLocationDict] = None  # 사용자 위치
 
     def save_search(self, results: List[JobDict], params: SearchParamsDict):
-        """검색 결과 저장 (최대 100건)"""
-        self.last_search_results = results[:100]
+        """검색 결과 저장 (최대 200건)"""
+        self.last_search_results = results[:200]
         self.last_search_params = params
         self.displayed_count = 0
 

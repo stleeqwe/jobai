@@ -43,10 +43,16 @@ async def run_full_crawl(num_workers: int = 3):
             print(f"\n[Phase 2] 저장 완료 (총 {len(jobs)}건)")
             _update_log_from_save(crawl_log, save_result)
 
+            # 미등장 공고 만료 처리 (크롤링에서 발견되지 않은 공고)
+            print("\n[Phase 3] 미등장 공고 만료 처리...")
+            active_ids = {job["id"] for job in jobs}
+            expired_missing = await mark_expired_jobs(active_ids)
+            print(f"  - 미등장 만료: {expired_missing}건")
+
             # 마감일 기준 만료 처리
-            print("\n[Phase 3] 마감일 기준 만료 처리...")
+            print("\n[Phase 4] 마감일 기준 만료 처리...")
             expired_by_deadline = await expire_by_deadline()
-            crawl_log["expired_jobs"] = expired_by_deadline
+            crawl_log["expired_jobs"] = expired_missing + expired_by_deadline
             print(f"  - 마감일 만료: {expired_by_deadline}건")
 
             crawl_log["status"] = "success"

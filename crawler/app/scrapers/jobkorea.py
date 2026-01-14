@@ -181,6 +181,7 @@ class JobKoreaScraper:
         pending_jobs = []  # 저장 대기 중인 jobs
         page_queue = asyncio.Queue()
         total_saved = {"new": 0, "updated": 0, "failed": 0}
+        no_more_jobs = False  # 공고 없음 플래그 (워커간 공유)
 
         # 페이지 큐 초기화 (start_page부터 start_page+max_pages까지)
         end_page = start_page + max_pages
@@ -210,11 +211,11 @@ class JobKoreaScraper:
 
         async def worker(worker_id: int):
             """개별 워커 태스크"""
-            nonlocal pending_jobs
+            nonlocal pending_jobs, no_more_jobs
             client = self.clients[worker_id]
             local_jobs = []
 
-            while not page_queue.empty() and not self.stats.is_blocked():
+            while not page_queue.empty() and not self.stats.is_blocked() and not no_more_jobs:
                 try:
                     page = await asyncio.wait_for(page_queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
@@ -224,7 +225,8 @@ class JobKoreaScraper:
                     jobs = await self._crawl_page_with_client(client, page, worker_id)
 
                     if jobs is None:  # 더 이상 공고 없음
-                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 종료", flush=True)
+                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 모든 워커 종료", flush=True)
+                        no_more_jobs = True  # 다른 워커들도 종료하도록
                         break
 
                     local_jobs.extend(jobs)
@@ -719,7 +721,7 @@ class JobKoreaScraper:
                             nearest_station = station_info.get("name", "")
                             station_walk_minutes = walk_minutes
 
-            return {
+            result = {
                 "job_type": normalized or primary_job_type,
                 "job_type_raw": ", ".join(job_types[:3]),
                 "job_category": category,
@@ -730,21 +732,28 @@ class JobKoreaScraper:
                 "salary_min": salary_data["min"],
                 "salary_max": salary_data["max"],
                 "salary_type": salary_data["type"],
-                "salary_source": salary_data.get("source", "parsed"),  # Phase 1: 급여 출처
-                "company_address": company_address,
+                "salary_source": salary_data.get("source", "parsed"),
                 "company_size": company_size,
                 "benefits": benefits,
                 "job_description": job_description,
-                # 위치 정보 추가 (상세 페이지에서 추출한 주소로 덮어씀)
-                "location_full": company_address,
-                "location_sido": location_info.get("sido", ""),
-                "location_gugun": location_info.get("gugun", ""),
-                "location_dong": location_info.get("dong", ""),
                 # V6: 가장 가까운 지하철역
                 "nearest_station": nearest_station,
                 "station_walk_minutes": station_walk_minutes,
                 **deadline_info,
             }
+
+            # 위치 정보: 상세 페이지에서 추출한 경우에만 덮어씀 (빈 값 방지)
+            if company_address:
+                result["company_address"] = company_address
+                result["location_full"] = company_address
+                if location_info.get("sido"):
+                    result["location_sido"] = location_info["sido"]
+                if location_info.get("gugun"):
+                    result["location_gugun"] = location_info["gugun"]
+                if location_info.get("dong"):
+                    result["location_dong"] = location_info["dong"]
+
+            return result
 
         except Exception as e:
             if settings.DEBUG:

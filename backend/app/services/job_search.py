@@ -117,7 +117,8 @@ async def _filter_from_db(
         # (향후 최적화: job_category 인덱스 활용)
 
         jobs = []
-        async for doc in query.limit(limit * 3).stream():  # 여유있게 조회
+        # 충분한 후보를 확보하기 위해 넉넉하게 조회 (필터링 후 limit 적용)
+        async for doc in query.limit(limit * 10).stream():
             job = doc.to_dict()
 
             # 직무 키워드 매칭
