@@ -12,29 +12,8 @@ from app.config import settings, USER_AGENTS
 from app.normalizers import normalize_job_type, get_job_category, get_mvp_category, normalize_location, parse_salary
 from app.normalizers.company import CompanyNormalizer, normalize_company
 from app.normalizers.dedup import DedupKeyGenerator, generate_dedup_key
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from app.services.seoul_subway_commute import SeoulSubwayCommute
-
-# 지하철 모듈 Lazy 초기화 (상세 페이지 크롤링 시에만 로드)
-_subway_module: "SeoulSubwayCommute | None" = None
-
-
-def _get_subway_module() -> "SeoulSubwayCommute | None":
-    """지하철 통근 모듈 Lazy 로드"""
-    global _subway_module
-    if _subway_module is None:
-        try:
-            from app.services.seoul_subway_commute import SeoulSubwayCommute
-            _subway_module = SeoulSubwayCommute()
-            if not _subway_module.is_initialized():
-                _subway_module = None
-        except Exception as e:
-            if settings.DEBUG:
-                print(f"[Crawler] 지하철 모듈 로드 실패: {e}")
-            _subway_module = None
-    return _subway_module
+# NOTE: nearest_station 계산은 후처리 배치로 이동 (scripts/enrich_nearest_station.py)
 
 
 class CrawlerStats:
@@ -156,102 +135,142 @@ class JobKoreaScraper:
         save_callback: Optional[callable] = None,
         save_batch_size: int = 500,
         start_page: int = 1
-    ) -> List[Dict]:
+    ) -> Tuple[int, set, Dict]:
         """
-        강남구 공고 병렬 크롤링 (중간 저장 지원)
+        병렬 크롤링 (asyncio.Event + 공유 카운터 + Save Queue)
 
         Args:
             max_pages: 최대 페이지 수 (None이면 전체)
             save_callback: 중간 저장 콜백 함수 (async def save(jobs) -> dict)
             save_batch_size: 중간 저장 배치 크기 (기본 500)
+            start_page: 시작 페이지 번호
 
         Returns:
-            수집된 채용공고 리스트
+            (수집된 공고 수, 수집된 ID 세트, 저장 통계) - 메모리 최적화
         """
         self.stats.start_time = datetime.now()
-        max_pages = max_pages or 10000  # 사실상 무제한
-
-        print(f"[Crawler] 강남구 병렬 크롤링 시작 (워커: {self.num_workers}개)", flush=True)
-        print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초", flush=True)
-        if save_callback:
-            print(f"[Crawler] 중간 저장: {save_batch_size}건마다", flush=True)
-
-        # 페이지 범위를 워커에게 분배
-        all_jobs = []
-        pending_jobs = []  # 저장 대기 중인 jobs
-        page_queue = asyncio.Queue()
-        total_saved = {"new": 0, "updated": 0, "failed": 0}
-        no_more_jobs = False  # 공고 없음 플래그 (워커간 공유)
-
-        # 페이지 큐 초기화 (start_page부터 start_page+max_pages까지)
+        max_pages = max_pages or 10000
         end_page = start_page + max_pages
-        for page in range(start_page, end_page):
-            await page_queue.put(page)
-        print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page-1}", flush=True)
 
-        # 결과 수집용 락
-        results_lock = asyncio.Lock()
+        print(f"[Crawler] 병렬 크롤링 시작 (워커: {self.num_workers}개)", flush=True)
+        print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초", flush=True)
+        print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page - 1}", flush=True)
 
-        async def save_pending():
-            """대기 중인 jobs 저장"""
-            nonlocal pending_jobs
-            if pending_jobs and save_callback:
-                to_save = pending_jobs[:]
-                pending_jobs = []
+        # === 공유 상태 (asyncio.Event + 카운터) ===
+        stop_event = asyncio.Event()  # 전역 종료 신호
+        page_lock = asyncio.Lock()
+        next_page = start_page
+
+        # === Save Queue (워커 → Saver 분리) ===
+        save_queue: asyncio.Queue = asyncio.Queue()
+        total_collected = 0  # 메모리 최적화: 리스트 대신 카운터
+        collected_ids: set = set()  # ID 세트만 추적 (mark_expired_jobs용)
+        total_saved = {"new": 0, "updated": 0, "failed": 0}
+        saver_done = asyncio.Event()
+
+        async def get_next_page() -> Optional[int]:
+            """다음 페이지 번호 반환 (종료 시 None)"""
+            nonlocal next_page
+            async with page_lock:
+                if next_page >= end_page or stop_event.is_set():
+                    return None
+                page = next_page
+                next_page += 1
+                return page
+
+        async def saver_task():
+            """저장 전용 태스크 (워커와 분리)"""
+            nonlocal total_collected
+            pending: List[Dict] = []
+
+            while True:
                 try:
-                    result = await save_callback(to_save)
+                    # 타임아웃으로 주기적으로 저장 체크
+                    job = await asyncio.wait_for(save_queue.get(), timeout=2.0)
+                    if job is None:  # 종료 신호
+                        break
+                    pending.append(job)
+                    total_collected += 1
+                    collected_ids.add(job.get("id"))
+
+                    # 배치 크기 도달 시 저장
+                    if len(pending) >= save_batch_size and save_callback:
+                        to_save = pending[:]
+                        pending = []
+                        try:
+                            result = await save_callback(to_save)
+                            total_saved["new"] += result.get("new", 0)
+                            total_saved["updated"] += result.get("updated", 0)
+                            total_saved["failed"] += result.get("failed", 0)
+                            print(f"[Saver] 저장 완료: {len(to_save)}건 (총: {total_saved['new'] + total_saved['updated']}건)", flush=True)
+                        except Exception as e:
+                            print(f"[Saver] 저장 실패: {e}", flush=True)
+                            pending.extend(to_save)
+
+                except asyncio.TimeoutError:
+                    # 타임아웃 시 중간 저장 (종료 대기 중)
+                    if stop_event.is_set() and pending and save_callback:
+                        try:
+                            result = await save_callback(pending)
+                            total_saved["new"] += result.get("new", 0)
+                            total_saved["updated"] += result.get("updated", 0)
+                            pending = []
+                        except Exception:
+                            pass
+                    continue
+
+            # 남은 데이터 저장
+            if pending and save_callback:
+                try:
+                    result = await save_callback(pending)
                     total_saved["new"] += result.get("new", 0)
                     total_saved["updated"] += result.get("updated", 0)
-                    total_saved["failed"] += result.get("failed", 0)
-                    print(f"[Crawler] 중간 저장 완료: {len(to_save)}건 (총 저장: {total_saved['new'] + total_saved['updated']}건)", flush=True)
+                    print(f"[Saver] 최종 저장: {len(pending)}건", flush=True)
                 except Exception as e:
-                    print(f"[Crawler] 중간 저장 실패: {e}", flush=True)
-                    # 실패 시 다시 pending에 추가
-                    pending_jobs.extend(to_save)
+                    print(f"[Saver] 최종 저장 실패: {e}", flush=True)
+
+            saver_done.set()
 
         async def worker(worker_id: int):
-            """개별 워커 태스크"""
-            nonlocal pending_jobs, no_more_jobs
+            """크롤링 워커 (저장은 save_queue로 위임)"""
             client = self.clients[worker_id]
-            local_jobs = []
+            local_count = 0
 
-            while not page_queue.empty() and not self.stats.is_blocked() and not no_more_jobs:
-                try:
-                    page = await asyncio.wait_for(page_queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
+            while not stop_event.is_set() and not self.stats.is_blocked():
+                page = await get_next_page()
+                if page is None:
                     break
 
                 try:
                     prev_skip_count = self.stats.total_skipped
-                    jobs = await self._crawl_page_with_client(client, page, worker_id)
+                    result = await self._crawl_page_with_client(client, page, worker_id)
 
-                    if jobs is None:  # 더 이상 공고 없음
-                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 모든 워커 종료", flush=True)
-                        no_more_jobs = True  # 다른 워커들도 종료하도록
+                    # 반환값 해석
+                    if result is None:  # 공고 없음 또는 차단
+                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 전체 종료 신호", flush=True)
+                        stop_event.set()
                         break
 
-                    # 페이지 단위 조기 중단: 빈 리스트 + 스킵 증가 = 전부 30일 이전
+                    jobs = result
+
+                    # 30일 이전 공고만 있는 페이지 감지
                     page_skip_count = self.stats.total_skipped - prev_skip_count
                     if len(jobs) == 0 and page_skip_count > 10:
-                        print(f"[Worker-{worker_id}] 페이지 {page}: 30일 이전 공고만 {page_skip_count}건, 조기 종료", flush=True)
-                        no_more_jobs = True
+                        print(f"[Worker-{worker_id}] 페이지 {page}: 30일 이전만 {page_skip_count}건, 종료", flush=True)
+                        stop_event.set()
                         break
 
-                    local_jobs.extend(jobs)
+                    # Save Queue에 추가 (블로킹 없이)
+                    for job in jobs:
+                        await save_queue.put(job)
+
+                    local_count += len(jobs)
                     self.stats.record_success(len(jobs))
 
-                    # 중간 저장 체크
-                    async with results_lock:
-                        pending_jobs.extend(jobs)
-                        all_jobs.extend(jobs)
-
-                        if len(pending_jobs) >= save_batch_size:
-                            await save_pending()
-
                     if page % 10 == 0 or page <= 3:
-                        print(f"[Worker-{worker_id}] 페이지 {page}: {len(jobs)}건 (누적 {len(local_jobs)}건)", flush=True)
+                        print(f"[Worker-{worker_id}] 페이지 {page}: {len(jobs)}건 (누적 {local_count}건)", flush=True)
 
-                    # 요청 간 딜레이 (랜덤 추가)
+                    # 요청 간 딜레이
                     delay = settings.CRAWL_DELAY_SECONDS + random.uniform(0.1, 0.5)
                     await asyncio.sleep(delay)
 
@@ -260,29 +279,33 @@ class JobKoreaScraper:
                     print(f"[Worker-{worker_id}] 페이지 {page} 실패: {e}", flush=True)
 
                     if self.stats.is_blocked():
-                        print(f"[Worker-{worker_id}] 차단 감지! 크롤링 중단", flush=True)
+                        print(f"[Worker-{worker_id}] 차단 감지! 전체 종료", flush=True)
+                        stop_event.set()
                         break
 
-                    # 실패 시 더 긴 딜레이
                     await asyncio.sleep(settings.CRAWL_DELAY_SECONDS * 3)
 
-            print(f"[Worker-{worker_id}] 종료 (수집: {len(local_jobs)}건)", flush=True)
+            print(f"[Worker-{worker_id}] 종료 (수집: {local_count}건)", flush=True)
 
-        # 워커들 실행
+        # === 실행 ===
+        # 1. Saver 태스크 시작
+        saver = asyncio.create_task(saver_task())
+
+        # 2. 워커들 실행
         workers = [worker(i) for i in range(self.num_workers)]
         await asyncio.gather(*workers)
 
-        # 남은 데이터 저장
-        async with results_lock:
-            if pending_jobs and save_callback:
-                await save_pending()
+        # 3. Saver 종료 신호 및 대기
+        await save_queue.put(None)
+        await saver
 
         print(f"\n[Crawler] 크롤링 완료", flush=True)
+        print(f"[Crawler] 수집: {total_collected}건", flush=True)
         print(f"[Crawler] 통계: {self.stats.summary()}", flush=True)
-        if save_callback:
-            print(f"[Crawler] 저장 결과: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건", flush=True)
+        print(f"[Crawler] 저장: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건", flush=True)
 
-        return all_jobs, total_saved
+        # 메모리 최적화: 전체 dict 대신 ID 세트만 반환
+        return total_collected, collected_ids, total_saved
 
     async def _crawl_page_with_client(
         self, client: httpx.AsyncClient, page: int, worker_id: int,
@@ -382,23 +405,24 @@ class JobKoreaScraper:
 
     # ========== 증분 업데이트 (최신 N건) ==========
 
-    async def crawl_latest(self, count: int = 200) -> List[Dict]:
+    async def crawl_latest(self, count: int = 200, parallel_batch_size: int = 5) -> List[Dict]:
         """
-        최신 공고 N건 수집 (매시간 업데이트용)
+        최신 공고 N건 수집 (매시간 업데이트용) - 병렬 처리
 
         Args:
             count: 수집할 공고 수 (기본 200, 피크시간 500)
+            parallel_batch_size: 상세 페이지 병렬 호출 배치 크기
 
         Returns:
             최신 채용공고 리스트
         """
         self.stats.start_time = datetime.now()
         client = self.clients[0]
-        all_jobs = []
+        all_jobs: List[Dict] = []
         page = 1
         cutoff_date = datetime.now() - timedelta(days=CrawlerStats.MAX_JOB_AGE_DAYS)
 
-        print(f"[Crawler] 최신 공고 {count}건 수집 시작 (30일 이내)")
+        print(f"[Crawler] 최신 공고 {count}건 수집 시작 (30일 이내, 병렬 {parallel_batch_size})", flush=True)
 
         while len(all_jobs) < count:
             try:
@@ -419,36 +443,63 @@ class JobKoreaScraper:
                 if not job_items:
                     break
 
+                # 1단계: 목록에서 기본 정보 파싱
+                parsed_jobs = []
                 for item in job_items:
-                    if len(all_jobs) >= count:
+                    if len(all_jobs) + len(parsed_jobs) >= count:
                         break
-
                     try:
                         job = self._parse_job_item(item)
                         if job and job.get("id"):
-                            job_id = job["id"].replace("jk_", "")
-                            detail_info = await self._fetch_detail_info(client, job_id, cutoff_date)
-                            if detail_info:
-                                # 30일 이전 공고 스킵
-                                if detail_info.get("_skip"):
-                                    self.stats.record_skip()
-                                    continue
-                                job.update(detail_info)
-                            all_jobs.append(job)
-                            await asyncio.sleep(0.3)
+                            parsed_jobs.append(job)
                     except Exception:
                         continue
 
-                self.stats.record_success(len(job_items))
+                # 2단계: 상세 페이지 병렬 호출 (배치 단위)
+                async def fetch_detail(job: Dict) -> Dict:
+                    try:
+                        job_id = job["id"].replace("jk_", "")
+                        detail_info = await self._fetch_detail_info(client, job_id, cutoff_date)
+                        if detail_info:
+                            if detail_info.get("_skip"):
+                                job["_skip"] = True
+                            else:
+                                job.update(detail_info)
+                    except Exception:
+                        pass
+                    return job
+
+                for batch_start in range(0, len(parsed_jobs), parallel_batch_size):
+                    batch = parsed_jobs[batch_start:batch_start + parallel_batch_size]
+                    tasks = [fetch_detail(job) for job in batch]
+                    batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    for result in batch_results:
+                        if isinstance(result, dict):
+                            if result.get("_skip"):
+                                self.stats.record_skip()
+                            else:
+                                all_jobs.append(result)
+                                if len(all_jobs) >= count:
+                                    break
+
+                    # 배치 간 딜레이
+                    if batch_start + parallel_batch_size < len(parsed_jobs):
+                        await asyncio.sleep(0.5)
+
+                    if len(all_jobs) >= count:
+                        break
+
+                self.stats.record_success(len(parsed_jobs))
                 page += 1
                 await asyncio.sleep(settings.CRAWL_DELAY_SECONDS)
 
             except Exception as e:
                 self.stats.record_failure(str(e))
-                print(f"[Crawler] 페이지 {page} 실패: {e}")
+                print(f"[Crawler] 페이지 {page} 실패: {e}", flush=True)
                 break
 
-        print(f"[Crawler] 최신 공고 수집 완료: {len(all_jobs)}건")
+        print(f"[Crawler] 최신 공고 수집 완료: {len(all_jobs)}건", flush=True)
         return all_jobs
 
     # ========== URL 검증 (404 체크) ==========
@@ -719,20 +770,7 @@ class JobKoreaScraper:
             # 주소에서 location 정보 추출
             location_info = normalize_location(company_address) if company_address else {}
 
-            # 12. 가장 가까운 지하철역 계산 (V6 신규)
-            nearest_station = ""
-            station_walk_minutes = None
-            if company_address:
-                subway = _get_subway_module()
-                if subway:
-                    coords = subway._parse_location(company_address)
-                    if coords:
-                        lat, lng = coords
-                        station_id, walk_minutes = subway._find_nearest_station(lat, lng)
-                        if station_id:
-                            station_info = subway.stations.get(station_id, {})
-                            nearest_station = station_info.get("name", "")
-                            station_walk_minutes = walk_minutes
+            # NOTE: nearest_station은 후처리 배치에서 계산 (크롤링 속도 최적화)
 
             result = {
                 "job_type": normalized or primary_job_type,
@@ -749,9 +787,6 @@ class JobKoreaScraper:
                 "company_size": company_size,
                 "benefits": benefits,
                 "job_description": job_description,
-                # V6: 가장 가까운 지하철역
-                "nearest_station": nearest_station,
-                "station_walk_minutes": station_walk_minutes,
                 **deadline_info,
             }
 

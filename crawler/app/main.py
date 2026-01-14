@@ -32,21 +32,20 @@ async def run_full_crawl(num_workers: int = 3):
     try:
         # 병렬 크롤링 (500건마다 중간 저장)
         print("\n[Phase 1] 병렬 크롤링 시작 (500건마다 중간 저장)...")
-        jobs, save_result = await scraper.crawl_all_parallel(
+        job_count, job_ids, save_result = await scraper.crawl_all_parallel(
             save_callback=save_jobs,
             save_batch_size=500
         )
-        crawl_log["total_crawled"] = len(jobs)
+        crawl_log["total_crawled"] = job_count
 
-        if jobs:
+        if job_count > 0:
             # 저장 결과 반영 (이미 중간 저장됨)
-            print(f"\n[Phase 2] 저장 완료 (총 {len(jobs)}건)")
+            print(f"\n[Phase 2] 저장 완료 (총 {job_count}건)")
             _update_log_from_save(crawl_log, save_result)
 
             # 미등장 공고 만료 처리 (크롤링에서 발견되지 않은 공고)
             print("\n[Phase 3] 미등장 공고 만료 처리...")
-            active_ids = {job["id"] for job in jobs}
-            expired_missing = await mark_expired_jobs(active_ids)
+            expired_missing = await mark_expired_jobs(job_ids)
             print(f"  - 미등장 만료: {expired_missing}건")
 
             # 마감일 기준 만료 처리

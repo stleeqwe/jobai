@@ -67,7 +67,7 @@ async def main():
                 return {'new': 0, 'updated': 0}
 
             # 크롤링 실행
-            jobs, save_result = await scraper.crawl_all_parallel(
+            batch_count, batch_ids, save_result = await scraper.crawl_all_parallel(
                 max_pages=PAGES_PER_BATCH,
                 start_page=current_page,
                 save_callback=save_callback,
@@ -75,7 +75,7 @@ async def main():
             )
 
             # 통계 업데이트
-            batch_collected = len(jobs)
+            batch_collected = batch_count
             batch_skipped = scraper.stats.total_skipped
             total_collected += batch_collected
             total_skipped += batch_skipped

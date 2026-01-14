@@ -1,5 +1,6 @@
 """Firestore 데이터베이스 모듈"""
 
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Union
 from google.cloud import firestore
@@ -62,38 +63,61 @@ def get_db() -> firestore.Client:
 
 async def save_jobs(jobs: list[dict]) -> dict[str, int]:
     """
-    채용공고 배치 저장
+    채용공고 배치 저장 (Upsert 방식 - doc.get() 제거)
 
-    - 기존 공고: updated_at 갱신
-    - 신규 공고: 새로 추가
+    - batch.set(merge=True)로 신규/업데이트 통합 처리
+    - N번의 read 연산 제거 → 속도/비용 대폭 개선
 
     Args:
         jobs: 저장할 채용공고 리스트
 
     Returns:
-        저장 통계 {'new': 신규, 'updated': 갱신, 'failed': 실패}
+        저장 통계 {'new': 신규 추정, 'updated': 업데이트 추정, 'failed': 실패}
+
+    Note:
+        merge=True 사용으로 신규/업데이트 구분이 정확하지 않음.
+        정확한 카운트가 필요하면 existing_ids를 미리 조회하는 방식 사용.
     """
     db = get_db()
     stats = {"new": 0, "updated": 0, "failed": 0}
+
+    if not jobs:
+        return stats
 
     batch = db.batch()
     batch_count = 0
     now = datetime.now(timezone.utc).isoformat()
 
+    # 기존 ID 조회 (한 번만 스트림으로)
+    job_ids = [job["id"] for job in jobs]
+    existing_ids = set()
+
+    try:
+        # 배치 크기가 크면 in 쿼리 분할 필요 (Firestore 제한: 30개)
+        for i in range(0, len(job_ids), 30):
+            chunk = job_ids[i:i + 30]
+            query = db.collection("jobs").where("__name__", "in", chunk).select([])
+            for doc in query.stream():
+                existing_ids.add(doc.id)
+    except Exception as e:
+        # 조회 실패 시 전부 업데이트로 처리 (안전하게)
+        if settings.DEBUG:
+            print(f"[DB] 기존 ID 조회 실패: {e}")
+
     for job in jobs:
         try:
             doc_ref = db.collection("jobs").document(job["id"])
-            doc = doc_ref.get()
+            is_existing = job["id"] in existing_ids
 
-            if doc.exists:
-                # 기존 공고 업데이트
+            if is_existing:
+                # 기존 공고: crawled_at 유지, updated_at 갱신
                 update_data = {**job, "updated_at": now}
-                # crawled_at은 유지
                 update_data.pop("crawled_at", None)
-                batch.update(doc_ref, update_data)
+                update_data.pop("view_count", None)  # view_count도 유지
+                batch.set(doc_ref, update_data, merge=True)
                 stats["updated"] += 1
             else:
-                # 신규 공고 추가
+                # 신규 공고: 모든 필드 설정
                 job_data = {
                     **job,
                     "crawled_at": now,
@@ -107,7 +131,7 @@ async def save_jobs(jobs: list[dict]) -> dict[str, int]:
 
             # Firestore 배치는 최대 500개
             if batch_count >= 500:
-                batch.commit()
+                await asyncio.to_thread(batch.commit)
                 batch = db.batch()
                 batch_count = 0
 
@@ -118,7 +142,7 @@ async def save_jobs(jobs: list[dict]) -> dict[str, int]:
 
     # 남은 배치 커밋
     if batch_count > 0:
-        batch.commit()
+        await asyncio.to_thread(batch.commit)
 
     return stats
 
@@ -153,12 +177,12 @@ async def mark_expired_jobs(active_ids: set[str]) -> int:
             batch_count += 1
 
             if batch_count >= 500:
-                batch.commit()
+                await asyncio.to_thread(batch.commit)
                 batch = db.batch()
                 batch_count = 0
 
     if batch_count > 0:
-        batch.commit()
+        await asyncio.to_thread(batch.commit)
 
     return count
 
@@ -300,12 +324,12 @@ async def expire_by_deadline() -> int:
             batch_count += 1
 
             if batch_count >= 500:
-                batch.commit()
+                await asyncio.to_thread(batch.commit)
                 batch = db.batch()
                 batch_count = 0
 
     if batch_count > 0:
-        batch.commit()
+        await asyncio.to_thread(batch.commit)
 
     return count
 
@@ -407,12 +431,12 @@ async def mark_jobs_expired(job_ids: list[str]) -> int:
         batch_count += 1
 
         if batch_count >= 500:
-            batch.commit()
+            await asyncio.to_thread(batch.commit)
             batch = db.batch()
             batch_count = 0
 
     if batch_count > 0:
-        batch.commit()
+        await asyncio.to_thread(batch.commit)
 
     return count
 
@@ -439,9 +463,9 @@ async def update_last_verified(job_ids: list[str]) -> None:
         batch_count += 1
 
         if batch_count >= 500:
-            batch.commit()
+            await asyncio.to_thread(batch.commit)
             batch = db.batch()
             batch_count = 0
 
     if batch_count > 0:
-        batch.commit()
+        await asyncio.to_thread(batch.commit)

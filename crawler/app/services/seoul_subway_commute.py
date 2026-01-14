@@ -41,6 +41,9 @@ class SeoulSubwayCommute:
     # 최대 도보 시간 (분)
     MAX_WALKING_MINUTES = 30
 
+    # 공간 인덱스 그리드 크기 (약 1km x 1km)
+    GRID_SIZE = 0.01  # 위도/경도 기준
+
     def __init__(self, data_dir: Optional[str] = None):
         """
         초기화
@@ -56,6 +59,9 @@ class SeoulSubwayCommute:
 
         # 좌표 목록: [(lat, lng, station_id), ...]
         self.station_coords: List[Tuple[float, float, str]] = []
+
+        # 공간 인덱스: {(grid_x, grid_y): [(lat, lng, station_id), ...]}
+        self.spatial_index: Dict[Tuple[int, int], List[Tuple[float, float, str]]] = {}
 
         # 역명 → station_id 매핑
         self.name_to_ids: Dict[str, List[str]] = {}
@@ -126,6 +132,10 @@ class SeoulSubwayCommute:
 
         self._initialized = True
 
+    def _get_grid_key(self, lat: float, lng: float) -> Tuple[int, int]:
+        """좌표를 그리드 키로 변환"""
+        return (int(lat / self.GRID_SIZE), int(lng / self.GRID_SIZE))
+
     def _add_station(self, station: Dict) -> None:
         """역 추가"""
         station_id = station["id"]
@@ -135,6 +145,12 @@ class SeoulSubwayCommute:
         lat, lng = station.get("lat", 0), station.get("lng", 0)
         if lat and lng:
             self.station_coords.append((lat, lng, station_id))
+
+            # 공간 인덱스에 추가
+            grid_key = self._get_grid_key(lat, lng)
+            if grid_key not in self.spatial_index:
+                self.spatial_index[grid_key] = []
+            self.spatial_index[grid_key].append((lat, lng, station_id))
 
         name = station.get("name", "")
         if name not in self.name_to_ids:
@@ -388,18 +404,34 @@ class SeoulSubwayCommute:
         lat: float,
         lng: float
     ) -> Tuple[Optional[str], int]:
-        """좌표에서 가장 가까운 역 찾기"""
-        if not self.station_coords:
+        """좌표에서 가장 가까운 역 찾기 (공간 인덱스 사용)"""
+        if not self.spatial_index:
             return None, 0
 
         min_dist = float('inf')
         nearest_id = None
 
-        for s_lat, s_lng, station_id in self.station_coords:
-            dist = self._haversine_distance(lat, lng, s_lat, s_lng)
-            if dist < min_dist:
-                min_dist = dist
-                nearest_id = station_id
+        # 현재 그리드 + 인접 9개 셀 검색 (3x3)
+        center_key = self._get_grid_key(lat, lng)
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                grid_key = (center_key[0] + dx, center_key[1] + dy)
+                if grid_key not in self.spatial_index:
+                    continue
+
+                for s_lat, s_lng, station_id in self.spatial_index[grid_key]:
+                    dist = self._haversine_distance(lat, lng, s_lat, s_lng)
+                    if dist < min_dist:
+                        min_dist = dist
+                        nearest_id = station_id
+
+        # 인접 셀에서 못 찾으면 전체 검색 (fallback)
+        if nearest_id is None and self.station_coords:
+            for s_lat, s_lng, station_id in self.station_coords:
+                dist = self._haversine_distance(lat, lng, s_lat, s_lng)
+                if dist < min_dist:
+                    min_dist = dist
+                    nearest_id = station_id
 
         if nearest_id is None:
             return None, 0

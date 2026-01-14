@@ -21,7 +21,7 @@ async def main():
 
     try:
         # 테스트: 3페이지만 크롤링 (약 200건)
-        jobs, stats = await scraper.crawl_all_parallel(
+        job_count, job_ids, stats = await scraper.crawl_all_parallel(
             max_pages=3,
             save_callback=None,  # 저장 없이 테스트
             save_batch_size=100
@@ -34,7 +34,7 @@ async def main():
         # 통계 출력
         summary = scraper.stats.summary()
         print(f"\n[통계]")
-        print(f"  - 수집된 공고: {len(jobs)}건")
+        print(f"  - 수집된 공고: {job_count}건")
         print(f"  - 30일 이전 공고 스킵: {summary['old_jobs_skipped']}건")
         print(f"  - 30일 조기 중단: {'예' if summary['stopped_by_old_jobs'] else '아니오'}")
         print(f"  - 소요 시간: {summary['elapsed_seconds']}초")
