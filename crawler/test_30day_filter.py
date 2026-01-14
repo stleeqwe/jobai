@@ -4,9 +4,10 @@
 import asyncio
 import sys
 from datetime import datetime
+from pathlib import Path
 
-# 경로 설정
-sys.path.insert(0, "/Users/stlee/Desktop/jobbot/jobai/crawler")
+# 경로 설정 (상대 경로)
+sys.path.insert(0, str(Path(__file__).parent))
 
 from app.scrapers.jobkorea import JobKoreaScraper
 
@@ -35,25 +36,16 @@ async def main():
         summary = scraper.stats.summary()
         print(f"\n[통계]")
         print(f"  - 수집된 공고: {job_count}건")
-        print(f"  - 30일 이전 공고 스킵: {summary['old_jobs_skipped']}건")
-        print(f"  - 30일 조기 중단: {'예' if summary['stopped_by_old_jobs'] else '아니오'}")
-        print(f"  - 소요 시간: {summary['elapsed_seconds']}초")
+        print(f"  - 30일 이전 스킵: {summary['total_skipped']}건")
+        print(f"  - 실패: {summary['total_failed']}건")
+        print(f"  - 차단 감지: {'예' if summary['is_blocked'] else '아니오'}")
+        print(f"  - 소요 시간: {summary['elapsed_seconds']}초 ({summary['elapsed_minutes']}분)")
 
-        # posted_at 필드 확인
-        print(f"\n[posted_at 필드 확인]")
-        jobs_with_posted_at = [j for j in jobs if j.get("posted_at")]
-        print(f"  - posted_at 있음: {len(jobs_with_posted_at)}건")
-        print(f"  - posted_at 없음: {len(jobs) - len(jobs_with_posted_at)}건")
-
-        # 샘플 출력
-        if jobs_with_posted_at:
-            print(f"\n[샘플 공고 (최신 5건)]")
-            for job in jobs_with_posted_at[:5]:
-                posted_at = job.get("posted_at")
-                posted_str = posted_at.strftime("%Y-%m-%d") if posted_at else "N/A"
-                print(f"  - [{posted_str}] {job.get('title', '')[:40]}...")
-                print(f"    회사: {job.get('company_name', 'N/A')}")
-                print(f"    지역: {job.get('location_sido', 'N/A')} {job.get('location_gugun', '')}")
+        # 수집된 ID 샘플
+        print(f"\n[수집된 ID 샘플 (최대 5개)]")
+        sample_ids = list(job_ids)[:5]
+        for job_id in sample_ids:
+            print(f"  - {job_id}")
 
         print("\n" + "=" * 60)
         print("테스트 완료!")
