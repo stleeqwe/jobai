@@ -39,19 +39,29 @@ def _get_subway_module() -> "SeoulSubwayCommute | None":
 
 class CrawlerStats:
     """크롤링 통계 추적"""
+
+    MAX_JOB_AGE_DAYS = 30  # 30일 이내 공고만 수집
+
     def __init__(self):
-        self.total_crawled = 0
-        self.total_failed = 0
+        self.total_crawled = 0       # 수집된 공고 수 (30일 이내)
+        self.total_skipped = 0       # 스킵된 공고 수 (30일 이전)
+        self.total_failed = 0        # 실패한 요청 수
         self.consecutive_failures = 0
         self.blocked_detected = False
         self.start_time = None
         self.errors = []
 
     def record_success(self, count: int = 1):
+        """최근 30일 공고 수집 성공"""
         self.total_crawled += count
         self.consecutive_failures = 0
 
+    def record_skip(self, count: int = 1):
+        """30일 이전 공고 스킵"""
+        self.total_skipped += count
+
     def record_failure(self, error: str = ""):
+        """요청 실패"""
         self.total_failed += 1
         self.consecutive_failures += 1
         if error:
@@ -70,9 +80,11 @@ class CrawlerStats:
         elapsed = (datetime.now() - self.start_time).total_seconds() if self.start_time else 0
         return {
             "total_crawled": self.total_crawled,
+            "total_skipped": self.total_skipped,
             "total_failed": self.total_failed,
             "failure_rate": f"{self.failure_rate:.1%}",
             "elapsed_seconds": int(elapsed),
+            "elapsed_minutes": round(elapsed / 60, 1),
             "is_blocked": self.is_blocked(),
             "recent_errors": self.errors[-5:] if self.errors else [],
         }
@@ -101,10 +113,10 @@ class JobKoreaScraper:
         "용산구": "I210", "은평구": "I220", "종로구": "I230", "중구": "I240", "중랑구": "I250",
     }
 
-    def __init__(self, num_workers: int = 1):
+    def __init__(self, num_workers: int = 2):
         """
         Args:
-            num_workers: 병렬 워커 수 (기본 1, 최대 3 권장 - 차단 방지)
+            num_workers: 병렬 워커 수 (기본 2, 최대 3 - 차단 방지)
         """
         self.num_workers = min(num_workers, 3)  # 최대 3개로 제한 (차단 방지)
         self.stats = CrawlerStats()
@@ -159,10 +171,10 @@ class JobKoreaScraper:
         self.stats.start_time = datetime.now()
         max_pages = max_pages or 10000  # 사실상 무제한
 
-        print(f"[Crawler] 강남구 병렬 크롤링 시작 (워커: {self.num_workers}개)")
-        print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초")
+        print(f"[Crawler] 강남구 병렬 크롤링 시작 (워커: {self.num_workers}개)", flush=True)
+        print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초", flush=True)
         if save_callback:
-            print(f"[Crawler] 중간 저장: {save_batch_size}건마다")
+            print(f"[Crawler] 중간 저장: {save_batch_size}건마다", flush=True)
 
         # 페이지 범위를 워커에게 분배
         all_jobs = []
@@ -174,7 +186,7 @@ class JobKoreaScraper:
         end_page = start_page + max_pages
         for page in range(start_page, end_page):
             await page_queue.put(page)
-        print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page-1}")
+        print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page-1}", flush=True)
 
         # 결과 수집용 락
         results_lock = asyncio.Lock()
@@ -190,9 +202,9 @@ class JobKoreaScraper:
                     total_saved["new"] += result.get("new", 0)
                     total_saved["updated"] += result.get("updated", 0)
                     total_saved["failed"] += result.get("failed", 0)
-                    print(f"[Crawler] 중간 저장 완료: {len(to_save)}건 (총 저장: {total_saved['new'] + total_saved['updated']}건)")
+                    print(f"[Crawler] 중간 저장 완료: {len(to_save)}건 (총 저장: {total_saved['new'] + total_saved['updated']}건)", flush=True)
                 except Exception as e:
-                    print(f"[Crawler] 중간 저장 실패: {e}")
+                    print(f"[Crawler] 중간 저장 실패: {e}", flush=True)
                     # 실패 시 다시 pending에 추가
                     pending_jobs.extend(to_save)
 
@@ -212,7 +224,7 @@ class JobKoreaScraper:
                     jobs = await self._crawl_page_with_client(client, page, worker_id)
 
                     if jobs is None:  # 더 이상 공고 없음
-                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 종료")
+                        print(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음, 종료", flush=True)
                         break
 
                     local_jobs.extend(jobs)
@@ -226,8 +238,8 @@ class JobKoreaScraper:
                         if len(pending_jobs) >= save_batch_size:
                             await save_pending()
 
-                    if page % 10 == 0:
-                        print(f"[Worker-{worker_id}] 페이지 {page}: {len(jobs)}건 (누적 {len(local_jobs)}건)")
+                    if page % 10 == 0 or page <= 3:
+                        print(f"[Worker-{worker_id}] 페이지 {page}: {len(jobs)}건 (누적 {len(local_jobs)}건)", flush=True)
 
                     # 요청 간 딜레이 (랜덤 추가)
                     delay = settings.CRAWL_DELAY_SECONDS + random.uniform(0.1, 0.5)
@@ -235,16 +247,16 @@ class JobKoreaScraper:
 
                 except Exception as e:
                     self.stats.record_failure(str(e))
-                    print(f"[Worker-{worker_id}] 페이지 {page} 실패: {e}")
+                    print(f"[Worker-{worker_id}] 페이지 {page} 실패: {e}", flush=True)
 
                     if self.stats.is_blocked():
-                        print(f"[Worker-{worker_id}] 차단 감지! 크롤링 중단")
+                        print(f"[Worker-{worker_id}] 차단 감지! 크롤링 중단", flush=True)
                         break
 
                     # 실패 시 더 긴 딜레이
                     await asyncio.sleep(settings.CRAWL_DELAY_SECONDS * 3)
 
-            print(f"[Worker-{worker_id}] 종료 (수집: {len(local_jobs)}건)")
+            print(f"[Worker-{worker_id}] 종료 (수집: {len(local_jobs)}건)", flush=True)
 
         # 워커들 실행
         workers = [worker(i) for i in range(self.num_workers)]
@@ -255,16 +267,16 @@ class JobKoreaScraper:
             if pending_jobs and save_callback:
                 await save_pending()
 
-        print(f"\n[Crawler] 크롤링 완료")
-        print(f"[Crawler] 통계: {self.stats.summary()}")
+        print(f"\n[Crawler] 크롤링 완료", flush=True)
+        print(f"[Crawler] 통계: {self.stats.summary()}", flush=True)
         if save_callback:
-            print(f"[Crawler] 저장 결과: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건")
+            print(f"[Crawler] 저장 결과: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건", flush=True)
 
         return all_jobs, total_saved
 
     async def _crawl_page_with_client(
         self, client: httpx.AsyncClient, page: int, worker_id: int,
-        parallel_batch_size: int = 3
+        parallel_batch_size: int = 5
     ) -> Optional[List[Dict]]:
         """
         특정 클라이언트로 페이지 크롤링 (상세 페이지 병렬 호출)
@@ -273,7 +285,7 @@ class JobKoreaScraper:
             client: HTTP 클라이언트
             page: 페이지 번호
             worker_id: 워커 ID
-            parallel_batch_size: 병렬 호출 배치 크기 (기본 3 - 차단 방지)
+            parallel_batch_size: 병렬 호출 배치 크기 (기본 5)
         """
         params = {
             "menucode": "local",
@@ -312,14 +324,22 @@ class JobKoreaScraper:
                     print(f"[Worker-{worker_id}] 아이템 파싱 실패: {e}")
                 continue
 
+        # 30일 필터링용 기준일
+        cutoff_date = datetime.now() - timedelta(days=CrawlerStats.MAX_JOB_AGE_DAYS)
+
         # 2단계: 상세 페이지 병렬 호출 (배치 단위)
         async def fetch_detail_with_delay(job: Dict, batch_idx: int) -> Dict:
-            """상세 정보 가져오기 (배치 내 딜레이 적용)"""
+            """상세 정보 가져오기 (배치 내 딜레이 적용, 30일 필터링)"""
             try:
                 job_id = job["id"].replace("jk_", "")
-                detail_info = await self._fetch_detail_info(client, job_id)
+                detail_info = await self._fetch_detail_info(client, job_id, cutoff_date)
                 if detail_info:
-                    job.update(detail_info)
+                    # 30일 이전 공고는 스킵
+                    if detail_info.get("_skip"):
+                        job["_skip"] = True
+                        job["posted_at"] = detail_info.get("posted_at")
+                    else:
+                        job.update(detail_info)
             except Exception as e:
                 if settings.DEBUG:
                     print(f"[Worker-{worker_id}] 상세 정보 실패 ({job['id']}): {e}")
@@ -336,14 +356,17 @@ class JobKoreaScraper:
             ]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # 성공한 결과만 추가
+            # 성공한 결과만 추가 (30일 이전 공고 제외)
             for result in batch_results:
                 if isinstance(result, dict):
-                    jobs.append(result)
+                    if result.get("_skip"):
+                        self.stats.record_skip()
+                    else:
+                        jobs.append(result)
 
             # 배치 간 딜레이 (차단 방지)
             if batch_start + parallel_batch_size < len(parsed_jobs):
-                await asyncio.sleep(1.0 + random.uniform(0.5, 1.0))  # 1.0~2.0초
+                await asyncio.sleep(0.8 + random.uniform(0.2, 0.4))  # 0.8~1.2초
 
         return jobs
 
@@ -515,9 +538,9 @@ class JobKoreaScraper:
         return None
 
     async def _fetch_detail_info(
-        self, client: httpx.AsyncClient, job_id: str
+        self, client: httpx.AsyncClient, job_id: str, cutoff_date: datetime = None
     ) -> Optional[Dict]:
-        """상세 페이지에서 직무 정보 추출"""
+        """상세 페이지에서 직무 정보 추출 (30일 조기 필터링 지원)"""
         try:
             url = f"{self.DETAIL_URL}/{job_id}"
             response = await self._fetch_with_retry(client, url, max_retries=2)
@@ -525,6 +548,12 @@ class JobKoreaScraper:
                 return None
 
             html = response.text
+
+            # 30일 조기 필터링: posted_at 먼저 추출하여 스킵 여부 결정
+            if cutoff_date:
+                posted_at = self._extract_posted_at(html)
+                if posted_at and posted_at < cutoff_date:
+                    return {"_skip": True, "posted_at": posted_at}
 
             # 1. workFields 추출
             work_fields_match = re.search(r'workFields\\\\?":\[([^\]]*)\]', html)
@@ -721,6 +750,28 @@ class JobKoreaScraper:
             if settings.DEBUG:
                 print(f"[Crawler] 상세 정보 추출 실패 ({job_id}): {e}")
             return None
+
+    def _extract_posted_at(self, html: str) -> Optional[datetime]:
+        """공고 등록일만 빠르게 추출 (30일 필터링용)"""
+        posted_patterns = [
+            r'applicationStartAt["\\\s:]*"?(\d{4}-\d{2}-\d{2}T[0-9:+\-]+)',
+            r'applyStartDate["\\\s:]*"?(\d{4}-\d{2}-\d{2})',
+            r'datePosted["\\\s:]*"?(\d{4}-\d{2}-\d{2})',
+        ]
+        for pattern in posted_patterns:
+            match = re.search(pattern, html)
+            if match:
+                date_str = match.group(1).strip()
+                try:
+                    if "T" in date_str:
+                        return datetime.fromisoformat(
+                            date_str.replace("+09:00", "").replace("Z", "")
+                        )
+                    elif "-" in date_str:
+                        return datetime.strptime(date_str[:10], "%Y-%m-%d")
+                except:
+                    pass
+        return None
 
     def _extract_deadline_info(self, html: str) -> Dict:
         """마감일 정보 상세 추출"""
