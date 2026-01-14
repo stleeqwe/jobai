@@ -66,6 +66,26 @@ async def health_check():
     }
 
 
+@app.get("/model-info")
+async def model_info():
+    """
+    AI 모델 정보 확인 엔드포인트
+
+    프론트엔드 앱 시작 시 Gemini 3 Flash 모델이 설정되어 있는지 확인
+    """
+    model = settings.GEMINI_MODEL
+    is_gemini3 = "gemini-3" in model
+
+    return {
+        "model": model,
+        "is_gemini3": is_gemini3,
+        "thinking_enabled": is_gemini3,  # Gemini 3는 thinking 기본 지원
+        "thinking_level": "high" if is_gemini3 else None,
+        "valid": is_gemini3,
+        "message": "Gemini 3 Flash 설정됨" if is_gemini3 else f"경고: {model}은 thinking 미지원"
+    }
+
+
 @app.get("/stats")
 async def stats():
     """

@@ -204,9 +204,9 @@ stats = await get_job_stats()
 
 | 이슈 | 상태 | 비고 |
 |------|------|------|
-| 크롤링 속도 느림 | 미해결 | 상세페이지 병렬화 필요 |
+| 크롤링 속도 느림 | 해결됨 | 상세페이지 병렬화 적용 |
 | Python 3.9 경고 | 미해결 | Python 3.10+ 업그레이드 권장 |
-| google.generativeai deprecated | 미해결 | google.genai로 마이그레이션 필요 |
+| google.generativeai deprecated | **해결됨** | google.genai SDK로 마이그레이션 완료 |
 
 ---
 
@@ -310,6 +310,10 @@ search_jobs()  "어떤 직무를 찾으시나요?"
 
 ## 변경 이력
 
+- **2026-01-14**: Gemini 3 Flash + Thinking Mode 적용
+  - 모델: gemini-3-flash-preview
+  - thinking_level: high (심층 추론)
+  - 프론트엔드: 앱 시작 시 모델 확인 로직 추가
 - **2026-01-13**: 아키텍처 V6 (Simple Agentic) 전환
   - gemini.py: LLM 자율 판단 로직 구현
   - job_search.py: 통근시간 기반 검색
@@ -320,3 +324,137 @@ search_jobs()  "어떤 직무를 찾으시나요?"
 - **2026-01-13**: 아키텍처 V3 설계 (3-Stage Sequential Filter with Maps API)
 - **2026-01-13**: 아키텍처 V2 설계 (2-Stage Hybrid) - 한계로 인해 V3로 대체
 - **2026-01-12**: HTML 셀렉터 수정, MVP 필터링 개선, CORS 설정 수정
+
+---
+
+## Gemini API 연동 가이드 (P0 - 필수 숙지!)
+
+### 1. 현재 사용 모델
+
+| 항목 | 값 | 비고 |
+|------|-----|------|
+| **모델명** | `gemini-3-flash-preview` | Gemini 3 Flash (최신) |
+| **SDK** | `google.genai` v1.47.0 | google.generativeai 아님! |
+| **Thinking** | `thinking_budget=8192` | SDK에서 thinking_level 미지원 |
+| **출력 토큰** | 8192 | 여유 있게 설정 |
+
+### 2. Gemini 모델 세대별 차이 (중요!)
+
+| 세대 | Thinking 설정 | 사용법 |
+|------|--------------|--------|
+| **Gemini 2.x** | `thinking_budget` (토큰 수) | `thinking_budget=1024` |
+| **Gemini 3.x** | `thinking_level` (레벨) | `thinking_level="high"` |
+
+**주의**:
+- Python SDK 1.47.0에서는 `thinking_level` 미지원! `thinking_budget` 사용
+- Gemini 3 Flash + `thinking_budget=8192` 조합으로 사용 중
+
+### 3. Thinking Level 옵션 (Gemini 3)
+
+| 레벨 | 용도 | 설명 |
+|------|------|------|
+| `"minimal"` | Flash only | 최소 추론, 가장 빠름 |
+| `"low"` | 단순 작업 | 간단한 지시, 채팅 |
+| `"medium"` | Flash only | 균형 잡힌 추론 |
+| `"high"` | **현재 사용** | 복잡한 추론, 코딩 |
+
+### 4. 설정 파일 위치 및 우선순위
+
+```
+.env 파일 > config.py 기본값
+
+⚠️ config.py를 수정해도 .env에 같은 키가 있으면 .env가 우선!
+```
+
+**설정 파일:**
+- `backend/.env` → `GEMINI_MODEL=gemini-3-flash-preview`
+- `backend/app/config.py` → 기본값 정의
+- `backend/app/services/gemini.py` → 실제 API 호출
+
+### 5. gemini.py 핵심 설정
+
+```python
+from google import genai
+from google.genai import types
+
+# 클라이언트 초기화
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+# Gemini 3 Flash 설정 (SDK 1.47.0 기준)
+# 참고: thinking_level은 SDK에서 미지원, thinking_budget 사용
+config = types.GenerateContentConfig(
+    system_instruction=system_prompt,
+    tools=[SEARCH_JOBS_TOOL],
+    thinking_config=types.ThinkingConfig(thinking_budget=8192),
+    max_output_tokens=8192
+)
+
+# API 호출
+response = client.models.generate_content(
+    model="gemini-3-flash-preview",
+    contents=memory.history,
+    config=config
+)
+```
+
+### 6. 모델 변경 시 체크리스트
+
+모델을 변경할 때 반드시 확인:
+
+1. [ ] `.env` 파일의 `GEMINI_MODEL` 수정
+2. [ ] Gemini 2.x ↔ 3.x 전환 시 `thinking_config` 수정
+   - 2.x: `thinking_budget=토큰수`
+   - 3.x: `thinking_level="레벨"`
+3. [ ] 백엔드 서버 재시작
+4. [ ] 프론트엔드에서 `/model-info` 확인
+
+### 7. 프론트엔드 모델 확인
+
+앱 시작 시 `/model-info` 엔드포인트 호출하여 Gemini 3 설정 확인.
+설정이 잘못되면 앱 실행 차단.
+
+```typescript
+// frontend/src/App.tsx
+useEffect(() => {
+  const checkModel = async () => {
+    const res = await fetch(`${API_BASE}/model-info`)
+    const data = await res.json()
+    if (!data.valid) {
+      setModelError(`AI 모델 설정 오류: ${data.message}`)
+    }
+  }
+  checkModel()
+}, [])
+```
+
+### 8. 디버깅 명령어
+
+```bash
+# 현재 설정된 모델 확인
+curl http://localhost:8000/model-info
+
+# 정상 응답 예시
+{
+  "model": "gemini-3-flash-preview",
+  "is_gemini3": true,
+  "thinking_enabled": true,
+  "thinking_level": "high",
+  "valid": true,
+  "message": "Gemini 3 Flash 설정됨"
+}
+```
+
+### 9. 흔한 실수 및 해결
+
+| 실수 | 증상 | 해결 |
+|------|------|------|
+| `.env` 미수정 | 구버전 모델 사용 | `.env` 파일 직접 수정 |
+| thinking_budget + Gemini 3 | API 에러 | `thinking_level`로 변경 |
+| 서버 미재시작 | 설정 미적용 | `uvicorn` 재시작 |
+| SDK 혼동 | ImportError | `google.genai` 사용 |
+
+### 10. 참고 문서
+
+- [Gemini Thinking Mode](https://ai.google.dev/gemini-api/docs/thinking)
+- [Gemini 3 Developer Guide](https://ai.google.dev/gemini-api/docs/gemini-3)
+- [python-genai SDK](https://github.com/googleapis/python-genai)

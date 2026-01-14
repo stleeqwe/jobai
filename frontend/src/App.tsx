@@ -1,11 +1,45 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChatWindow } from './components/ChatWindow'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+interface ModelInfo {
+  model: string
+  is_gemini3: boolean
+  thinking_enabled: boolean
+  thinking_level: string | null
+  valid: boolean
+  message: string
+}
+
 function App() {
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
+  const [modelError, setModelError] = useState<string | null>(null)
+  const [isCheckingModel, setIsCheckingModel] = useState(true)
+
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackText, setFeedbackText] = useState('')
-
   const [isSending, setIsSending] = useState(false)
+
+  // 앱 시작 시 모델 확인
+  useEffect(() => {
+    const checkModel = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/model-info`)
+        if (!res.ok) throw new Error('서버 응답 오류')
+        const data: ModelInfo = await res.json()
+        setModelInfo(data)
+        if (!data.valid) {
+          setModelError(`AI 모델 설정 오류: ${data.message}`)
+        }
+      } catch (err) {
+        setModelError('백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.')
+      } finally {
+        setIsCheckingModel(false)
+      }
+    }
+    checkModel()
+  }, [])
 
   const handleSendFeedback = async () => {
     if (!feedbackText.trim() || isSending) return
@@ -37,6 +71,39 @@ function App() {
     } finally {
       setIsSending(false)
     }
+  }
+
+  // 모델 확인 중
+  if (isCheckingModel) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-primary-100 to-primary-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">AI 모델 확인 중...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 모델 오류
+  if (modelError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-red-100 to-red-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl mb-4">!</div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">서비스 시작 불가</h1>
+          <p className="text-gray-600 mb-4">{modelError}</p>
+          {modelInfo && (
+            <div className="bg-gray-100 rounded-lg p-3 text-sm text-left mb-4">
+              <p><strong>현재 모델:</strong> {modelInfo.model}</p>
+              <p><strong>필요 모델:</strong> gemini-3-flash-preview</p>
+              <p><strong>Thinking:</strong> {modelInfo.thinking_enabled ? 'O' : 'X'}</p>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">backend/.env 파일에서 GEMINI_MODEL 설정을 확인하세요.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
