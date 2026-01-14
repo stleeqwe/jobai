@@ -9,53 +9,39 @@ Gemini 3 Flash + google.genai SDK 사용
 """
 
 import logging
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from google import genai
 from google.genai import types
 
 from app.config import settings
+from app.models.types import (
+    JobDict,
+    UserLocationDict,
+    GeminiResultDict,
+    MoreResultsDict,
+    SearchParamsDict,
+    PaginationDict
+)
 from app.services.job_search import search_jobs_with_commute, format_job_results, _matches_company_location
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# System Prompt - V6 Simple Agentic (Reasoning Model Optimized)
+# System Prompt - V6 Simple Agentic (외부 파일에서 로드)
 # =============================================================================
-SYSTEM_PROMPT_TEMPLATE = """
-당신은 채용공고 검색 전문가 "잡챗"입니다.
-{user_location_info}
+def _load_system_prompt() -> str:
+    """시스템 프롬프트를 외부 파일에서 로드"""
+    prompt_path = Path(__file__).parent.parent / "prompts" / "system_prompt.txt"
+    try:
+        return prompt_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        logger.warning(f"시스템 프롬프트 파일을 찾을 수 없습니다: {prompt_path}")
+        return "당신은 채용공고 검색 전문가입니다."
 
-## 핵심 목표
-사용자가 원하는 채용공고를 찾아주는 것. 대화 맥락을 이해하고 자율적으로 판단하세요.
-
-## 사용 가능한 함수
-
-### search_jobs: 채용공고 검색
-- job_keywords: 직무 키워드 (필수)
-- salary_min: 최소 연봉, 만원 단위 (필수). "3천"=3000, "무관"=0
-- company_location: 회사 위치 필터 (선택). "강남역", "서초구" 등
-- commute_max_minutes: 통근시간 제한 (선택). 사용자가 명시할 때만
-
-### filter_results: 이전 검색 결과 필터링
-- 기존 결과에서 조건 추가할 때 사용 (연봉 상향, 지역 한정 등)
-
-## 판단 기준
-
-1. **검색 실행 조건**: 직무 + 연봉 정보가 있으면 search_jobs 호출
-2. **정보 부족 시**: 자연스럽게 질문 (연봉만 물어보면 됨)
-3. **후속 대화**: 대화 맥락을 파악하여 적절히 판단
-   - 조건 강화 (더 좁히기) → filter_results
-   - 조건 완화/변경 (더 넓히기, 직무 변경) → search_jobs
-4. **이전 검색 맥락 유지**: 후속 요청 시 이전 직무/연봉 기억하고 활용
-
-## 응답 원칙
-- 검색 결과는 간결하게: "총 N건을 찾았습니다" 정도
-- 상세 목록은 프론트엔드가 표시하므로 나열하지 마세요
-- 가상의 결과를 만들지 마세요 - 반드시 함수 호출
-- 이모지 사용 금지
-"""
+SYSTEM_PROMPT_TEMPLATE = _load_system_prompt()
 
 
 # =============================================================================
@@ -129,19 +115,19 @@ class ConversationMemory:
 
     def __init__(self, conversation_id: str):
         self.conversation_id = conversation_id
-        self.last_search_results: List[Dict] = []  # 최대 100건 저장
-        self.last_search_params: Dict = {}
+        self.last_search_results: List[JobDict] = []  # 최대 100건 저장
+        self.last_search_params: SearchParamsDict = {}
         self.displayed_count: int = 0  # 이미 보여준 개수
         self.history: List[types.Content] = []  # 대화 히스토리
-        self.user_location: Dict[str, Any] = None  # 사용자 위치
+        self.user_location: Optional[UserLocationDict] = None  # 사용자 위치
 
-    def save_search(self, results: List[Dict], params: Dict):
+    def save_search(self, results: List[JobDict], params: SearchParamsDict):
         """검색 결과 저장 (최대 100건)"""
         self.last_search_results = results[:100]
         self.last_search_params = params
         self.displayed_count = 0
 
-    def get_next_batch(self, batch_size: int = 50) -> List[Dict]:
+    def get_next_batch(self, batch_size: int = 50) -> List[JobDict]:
         """다음 배치 반환 (더보기용)"""
         start = self.displayed_count
         end = start + batch_size
@@ -159,11 +145,11 @@ class ConversationMemory:
 
     def filter_cached_results(
         self,
-        salary_min: int = None,
-        salary_max: int = None,
-        commute_max_minutes: int = None,
-        company_location: str = None
-    ) -> List[Dict]:
+        salary_min: Optional[int] = None,
+        salary_max: Optional[int] = None,
+        commute_max_minutes: Optional[int] = None,
+        company_location: Optional[str] = None
+    ) -> List[JobDict]:
         """캐시된 결과를 필터링하여 반환
 
         정책:
@@ -231,7 +217,7 @@ class GeminiService:
             self._memories[conversation_id] = ConversationMemory(conversation_id)
         return self._memories[conversation_id]
 
-    def _build_system_prompt(self, user_location: Dict[str, Any] = None) -> str:
+    def _build_system_prompt(self, user_location: Optional[UserLocationDict] = None) -> str:
         """사용자 위치 정보를 포함한 시스템 프롬프트 생성"""
         if user_location:
             address = user_location.get("address", "")
@@ -250,8 +236,8 @@ class GeminiService:
         self,
         message: str,
         conversation_id: str = "",
-        user_location: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
+        user_location: Optional[UserLocationDict] = None,
+    ) -> GeminiResultDict:
         """
         메시지 처리 - V6 Simple Agentic
 
@@ -475,7 +461,7 @@ class GeminiService:
                 "error": str(e)
             }
 
-    async def get_more_results(self, conversation_id: str) -> Dict[str, Any]:
+    async def get_more_results(self, conversation_id: str) -> MoreResultsDict:
         """더보기 - LLM 호출 없이 메모리에서 반환"""
         memory = self._get_memory(conversation_id)
 
@@ -493,6 +479,7 @@ class GeminiService:
             "response": f"추가 {len(next_batch)}건이에요.",
             "jobs": format_job_results(next_batch),
             "pagination": {
+                "total_count": len(memory.last_search_results),
                 "displayed": memory.displayed_count,
                 "has_more": memory.has_more(),
                 "remaining": memory.get_remaining_count()
@@ -500,7 +487,7 @@ class GeminiService:
             "success": True
         }
 
-    def _format_jobs_for_llm(self, jobs: List[Dict]) -> List[str]:
+    def _format_jobs_for_llm(self, jobs: List[JobDict]) -> List[str]:
         """LLM에 전달할 공고 목록 포맷팅 (토큰 최적화)"""
         lines = []
         for i, job in enumerate(jobs, 1):

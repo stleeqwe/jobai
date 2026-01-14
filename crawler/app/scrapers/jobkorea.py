@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Tuple
 from bs4 import BeautifulSoup
 import httpx
 
-from app.config import settings
+from app.config import settings, USER_AGENTS
 from app.normalizers import normalize_job_type, get_job_category, get_mvp_category, normalize_location, parse_salary
 from app.normalizers.company import CompanyNormalizer, normalize_company
 from app.normalizers.dedup import DedupKeyGenerator, generate_dedup_key
@@ -35,16 +35,6 @@ def _get_subway_module() -> "SeoulSubwayCommute | None":
                 print(f"[Crawler] 지하철 모듈 로드 실패: {e}")
             _subway_module = None
     return _subway_module
-
-
-# User-Agent 로테이션 풀
-USER_AGENTS = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-]
 
 
 class CrawlerStats:
@@ -152,7 +142,8 @@ class JobKoreaScraper:
         self,
         max_pages: Optional[int] = None,
         save_callback: Optional[callable] = None,
-        save_batch_size: int = 500
+        save_batch_size: int = 500,
+        start_page: int = 1
     ) -> List[Dict]:
         """
         강남구 공고 병렬 크롤링 (중간 저장 지원)
@@ -179,9 +170,11 @@ class JobKoreaScraper:
         page_queue = asyncio.Queue()
         total_saved = {"new": 0, "updated": 0, "failed": 0}
 
-        # 페이지 큐 초기화 (1부터 max_pages까지)
-        for page in range(1, max_pages + 1):
+        # 페이지 큐 초기화 (start_page부터 start_page+max_pages까지)
+        end_page = start_page + max_pages
+        for page in range(start_page, end_page):
             await page_queue.put(page)
+        print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page-1}")
 
         # 결과 수집용 락
         results_lock = asyncio.Lock()
@@ -921,12 +914,3 @@ class JobKoreaScraper:
         return "경력무관", None, None
 
 
-# ========== 하위 호환성을 위한 래퍼 ==========
-
-async def crawl_all(max_pages: Optional[int] = None) -> List[Dict]:
-    """기존 인터페이스 호환 래퍼"""
-    scraper = JobKoreaScraper(num_workers=1)
-    try:
-        return await scraper.crawl_all_parallel(max_pages)
-    finally:
-        await scraper.close()

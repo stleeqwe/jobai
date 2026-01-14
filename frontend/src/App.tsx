@@ -3,6 +3,11 @@ import { ChatWindow } from './components/ChatWindow'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// EmailJS 설정
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || ''
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || ''
+const EMAILJS_USER_ID = import.meta.env.VITE_EMAILJS_USER_ID || ''
+
 interface ModelInfo {
   model: string
   is_gemini3: boolean
@@ -49,9 +54,9 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_id: 'service_6qol534',
-          template_id: 'template_3ulikof',
-          user_id: 'a68AfNe8lYyVkne3h',
+          service_id: EMAILJS_SERVICE_ID,
+          template_id: EMAILJS_TEMPLATE_ID,
+          user_id: EMAILJS_USER_ID,
           template_params: {
             name: 'JOBBOT 사용자',
             email: 'anonymous@jobbot.com',

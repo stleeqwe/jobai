@@ -87,43 +87,6 @@ class SubwayService:
 
         return self._commute.calculate(origin, destination)
 
-    async def filter_jobs_by_travel_time(
-        self,
-        jobs: List[Dict[str, Any]],
-        origin: str,
-        max_minutes: int
-    ) -> List[Dict[str, Any]]:
-        """
-        통근시간 기준 공고 필터링 (V4 호환)
-
-        Args:
-            jobs: 공고 리스트 (location_full 필드 필요)
-            origin: 출발지 (역명, 주소, 또는 "lat,lng" 좌표)
-            max_minutes: 최대 통근시간 (분)
-
-        Returns:
-            통근시간 조건 충족 공고 (travel_time_minutes, travel_time_text 필드 추가)
-        """
-        if not self.is_available():
-            logger.warning("SubwayService 사용 불가 - 초기화 필요")
-            return []
-
-        if not jobs:
-            return []
-
-        logger.info(f"출발지: {origin}, 최대 {max_minutes}분")
-
-        # SeoulSubwayCommute.filter_jobs() 호출
-        results = self._commute.filter_jobs(
-            jobs=jobs,
-            origin=origin,
-            max_minutes=max_minutes
-        )
-
-        logger.info(f"통근시간 필터: {len(jobs)}건 → {len(results)}건 (최대 {max_minutes}분)")
-
-        return results
-
     def filter_jobs(self, jobs: List[Dict], origin: str, max_minutes: int) -> List[Dict]:
         """공고 필터링 (동기 버전)"""
         if not self.is_available():

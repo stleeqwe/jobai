@@ -40,9 +40,9 @@ def init_firestore() -> None:
             # ADC 사용
             _db = firestore.AsyncClient(project=settings.GOOGLE_CLOUD_PROJECT)
 
-        print("[Firestore] 연결 성공")
+        logger.info("Firestore 연결 성공")
     except Exception as e:
-        print(f"[Firestore] 연결 실패 (로컬 모드): {e}")
+        logger.warning(f"Firestore 연결 실패 (로컬 모드): {e}")
         _db = None
 
 

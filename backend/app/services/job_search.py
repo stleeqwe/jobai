@@ -3,13 +3,19 @@
 직무 + 연봉 필터링 후 지하철 통근시간 계산 및 필터링
 """
 
+import json
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.db import get_db
+from app.models.types import JobDict, FormattedJobDict, SearchResultDict
 from app.services.subway import subway_service
 
 logger = logging.getLogger(__name__)
+
+# 더미 데이터 경로
+DUMMY_JOBS_PATH = Path(__file__).parent.parent / "data" / "dummy_jobs.json"
 
 
 async def search_jobs_with_commute(
@@ -19,7 +25,7 @@ async def search_jobs_with_commute(
     commute_max_minutes: Optional[int] = None,
     salary_max: Optional[int] = None,
     company_location: str = "",
-) -> Dict[str, Any]:
+) -> SearchResultDict:
     """
     채용공고 검색 (통근시간 필터는 선택적)
 
@@ -86,7 +92,7 @@ async def _filter_from_db(
     salary_max: Optional[int] = None,
     company_location: str = "",
     limit: int = 2000
-) -> List[Dict]:
+) -> List[JobDict]:
     """
     DB에서 직무+연봉+회사위치 기준 필터링
 
@@ -140,11 +146,11 @@ async def _filter_from_db(
 
 def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
     """
-    직무 키워드 매칭 (유연한 처리)
+    직무 키워드 매칭 (AI 확장 키워드 기반)
 
-    LLM이 어떻게 키워드를 넘기든 유연하게 처리:
-    - "프런트 앱 개발자" → ["프런트", "앱", "개발자"]로 분리
-    - 하나라도 매칭되면 True
+    AI가 유사어/동의어를 확장해서 전달하므로 키워드를 통째로 매칭.
+    - ["웹디자이너", "UI디자이너", "웹퍼블리셔"] 중 하나라도 매칭되면 True
+    - 공백 제거 버전도 함께 매칭 (웹 디자이너 → 웹디자이너)
     """
     if not keywords:
         return True
@@ -155,20 +161,23 @@ def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
     job_keywords_field = [k.lower() for k in job.get("job_keywords", [])]
     search_text = f"{title} {job_type_raw}"
 
-    # 모든 키워드에서 개별 단어 추출
-    all_words = set()
+    # 각 키워드를 통째로 매칭 (AI가 이미 확장해줌)
     for keyword in keywords:
-        # 공백으로 분리하여 각 단어 추가
-        for word in keyword.lower().split():
-            if len(word) >= 2:  # 2글자 이상만
-                all_words.add(word)
+        kw = keyword.lower().strip()
+        if len(kw) < 2:
+            continue
 
-    # 하나라도 매칭되면 True
-    for word in all_words:
-        if word in search_text:
+        # 공백 제거 버전도 생성 (웹 디자이너 → 웹디자이너)
+        kw_no_space = kw.replace(" ", "")
+
+        # 1. 키워드가 title이나 job_type_raw에 포함되는지
+        if kw in search_text or kw_no_space in search_text:
             return True
-        if any(word in jk for jk in job_keywords_field):
-            return True
+
+        # 2. job_keywords 필드에 포함되는지
+        for jk in job_keywords_field:
+            if kw in jk or kw_no_space in jk or jk in kw or jk in kw_no_space:
+                return True
 
     return False
 
@@ -267,10 +276,10 @@ def _matches_company_location(job: Dict, company_location: str) -> bool:
 
 
 async def _calculate_commute_times(
-    jobs: List[Dict],
+    jobs: List[JobDict],
     origin: str,
     max_minutes: int
-) -> List[Dict]:
+) -> List[JobDict]:
     """
     통근시간 계산 및 필터링
 
@@ -318,12 +327,12 @@ async def _calculate_commute_times(
     return results
 
 
-def format_job_results(jobs: List[Dict]) -> List[Dict]:
+def format_job_results(jobs: List[JobDict]) -> List[FormattedJobDict]:
     """API 응답용 포맷팅"""
-    results = []
+    results: List[FormattedJobDict] = []
 
     for job in jobs:
-        formatted = {
+        formatted: FormattedJobDict = {
             "id": job.get("id", ""),
             "company_name": job.get("company_name", ""),
             "title": job.get("title", ""),
@@ -413,106 +422,16 @@ async def get_job_stats() -> Dict[str, Any]:
         }
 
 
-def _get_dummy_jobs() -> List[Dict]:
-    """로컬 테스트용 더미 데이터"""
-    return [
-        {
-            "id": "demo_001",
-            "company_name": "테크스타트업",
-            "title": "Flutter 앱 개발자",
-            "job_type_raw": "앱개발",
-            "location_full": "서울 강남구 역삼동",
-            "location_gugun": "강남구",
-            "salary_text": "5,000~7,000만원",
-            "salary_min": 5000,
-            "experience_type": "경력무관",
-            "employment_type": "정규직",
-            "deadline": "상시채용",
-            "url": "https://www.jobkorea.co.kr",
-        },
-        {
-            "id": "demo_002",
-            "company_name": "글로벌테크",
-            "title": "React Native 개발자",
-            "job_type_raw": "앱개발",
-            "location_full": "서울 중구 을지로3가",
-            "location_gugun": "중구",
-            "salary_text": "6,000~8,000만원",
-            "salary_min": 6000,
-            "experience_type": "경력",
-            "experience_min": 3,
-            "employment_type": "정규직",
-            "deadline": "2026-02-28",
-            "url": "https://www.jobkorea.co.kr",
-        },
-        {
-            "id": "demo_003",
-            "company_name": "IT솔루션즈",
-            "title": "iOS 앱 개발자",
-            "job_type_raw": "iOS개발",
-            "location_full": "서울 종로구 종로3가",
-            "location_gugun": "종로구",
-            "salary_text": "회사 내규에 따름",
-            "salary_min": None,
-            "experience_type": "경력",
-            "experience_min": 2,
-            "employment_type": "정규직",
-            "deadline": "2026-01-31",
-            "url": "https://www.jobkorea.co.kr",
-        },
-        {
-            "id": "demo_004",
-            "company_name": "디자인팩토리",
-            "title": "UI/UX 디자이너",
-            "job_type_raw": "웹디자인",
-            "location_full": "서울 마포구 상암동",
-            "location_gugun": "마포구",
-            "salary_text": "4,500~6,500만원",
-            "salary_min": 4500,
-            "experience_type": "경력무관",
-            "employment_type": "정규직",
-            "deadline": "2026-02-15",
-            "url": "https://www.jobkorea.co.kr",
-        },
-        {
-            "id": "demo_005",
-            "company_name": "백엔드코리아",
-            "title": "Java 백엔드 개발자",
-            "job_type_raw": "백엔드개발",
-            "location_full": "서울 강남구 삼성동",
-            "location_gugun": "강남구",
-            "salary_text": "5,500~8,000만원",
-            "salary_min": 5500,
-            "experience_type": "경력",
-            "experience_min": 3,
-            "employment_type": "정규직",
-            "deadline": "상시채용",
-            "url": "https://www.jobkorea.co.kr",
-        },
-        {
-            "id": "demo_006",
-            "company_name": "마케팅허브",
-            "title": "퍼포먼스 마케터",
-            "job_type_raw": "마케팅",
-            "location_full": "서울 서초구 서초동",
-            "location_gugun": "서초구",
-            "salary_text": "3,800~5,500만원",
-            "salary_min": 3800,
-            "experience_type": "신입",
-            "employment_type": "정규직",
-            "deadline": "상시채용",
-            "url": "https://www.jobkorea.co.kr",
-        },
-    ]
+def _get_dummy_jobs() -> List[JobDict]:
+    """로컬 테스트용 더미 데이터 (외부 JSON 파일에서 로드)"""
+    try:
+        with open(DUMMY_JOBS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.warning(f"더미 데이터 파일을 찾을 수 없습니다: {DUMMY_JOBS_PATH}")
+        return []
+    except json.JSONDecodeError as e:
+        logger.error(f"더미 데이터 파싱 오류: {e}")
+        return []
 
 
-# ========== 하위 호환성을 위한 레거시 함수 ==========
-
-async def get_all_active_jobs() -> List[Dict]:
-    """[V4 호환] 전체 활성 공고 조회"""
-    return await _filter_from_db(job_keywords=[], salary_min=0)
-
-
-def filter_by_salary(jobs: List[Dict], salary_min: int) -> List[Dict]:
-    """[V4 호환] 연봉 조건 필터링"""
-    return [j for j in jobs if _matches_salary(j, salary_min, None)]

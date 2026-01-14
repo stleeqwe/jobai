@@ -2,6 +2,7 @@
 
 import uuid
 import logging
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import (
@@ -12,10 +13,39 @@ from app.models.schemas import (
     MoreResultsRequest,
     MoreResultsResponse
 )
+from app.models.types import FormattedJobDict, UserLocationDict
 from app.services.gemini import gemini_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _create_job_item(job: FormattedJobDict) -> JobItem:
+    """딕셔너리에서 JobItem 생성"""
+    return JobItem(
+        id=job.get("id", ""),
+        company_name=job.get("company_name", ""),
+        title=job.get("title", ""),
+        location=job.get("location", ""),
+        salary=job.get("salary_text", "협의"),
+        experience=job.get("experience_type", ""),
+        employment_type=job.get("employment_type", ""),
+        deadline=job.get("deadline", ""),
+        url=job.get("url", ""),
+        commute_minutes=job.get("commute_minutes"),
+        commute_text=job.get("commute_text", "")
+    )
+
+
+def _convert_jobs(raw_jobs: List[FormattedJobDict]) -> List[JobItem]:
+    """딕셔너리 리스트를 JobItem 리스트로 변환"""
+    jobs = []
+    for job in raw_jobs:
+        try:
+            jobs.append(_create_job_item(job))
+        except Exception as e:
+            logger.warning(f"JobItem 생성 실패: {e}")
+    return jobs
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -47,12 +77,12 @@ async def chat(request: ChatRequest):
             raise HTTPException(status_code=400, detail="메시지가 너무 깁니다. (최대 1000자)")
 
         # 사용자 위치 정보 추출
-        user_location = None
+        user_location: Optional[UserLocationDict] = None
         if request.user_location:
             user_location = {
                 "latitude": request.user_location.latitude,
                 "longitude": request.user_location.longitude,
-                "address": request.user_location.address
+                "address": request.user_location.address or ""
             }
 
         # Gemini 처리 (V6: Simple Agentic)
@@ -66,24 +96,7 @@ async def chat(request: ChatRequest):
             logger.error(f"Gemini 처리 실패: {result.get('error')}")
 
         # 응답 구성
-        jobs = []
-        for job in result.get("jobs", []):
-            try:
-                jobs.append(JobItem(
-                    id=job.get("id", ""),
-                    company_name=job.get("company_name", ""),
-                    title=job.get("title", ""),
-                    location=job.get("location", ""),
-                    salary=job.get("salary_text", "협의"),
-                    experience=job.get("experience_type", ""),
-                    employment_type=job.get("employment_type", ""),
-                    deadline=job.get("deadline", ""),
-                    url=job.get("url", ""),
-                    commute_minutes=job.get("commute_minutes"),
-                    commute_text=job.get("commute_text", "")
-                ))
-            except Exception as e:
-                logger.warning(f"JobItem 생성 실패: {e}")
+        jobs = _convert_jobs(result.get("jobs", []))
 
         pagination = None
         if result.get("pagination"):
@@ -132,24 +145,7 @@ async def load_more(request: MoreResultsRequest):
             )
 
         # 응답 구성
-        jobs = []
-        for job in result.get("jobs", []):
-            try:
-                jobs.append(JobItem(
-                    id=job.get("id", ""),
-                    company_name=job.get("company_name", ""),
-                    title=job.get("title", ""),
-                    location=job.get("location", ""),
-                    salary=job.get("salary_text", "협의"),
-                    experience=job.get("experience_type", ""),
-                    employment_type=job.get("employment_type", ""),
-                    deadline=job.get("deadline", ""),
-                    url=job.get("url", ""),
-                    commute_minutes=job.get("commute_minutes"),
-                    commute_text=job.get("commute_text", "")
-                ))
-            except Exception as e:
-                logger.warning(f"JobItem 생성 실패: {e}")
+        jobs = _convert_jobs(result.get("jobs", []))
 
         pagination = None
         if result.get("pagination"):

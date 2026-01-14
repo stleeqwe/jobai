@@ -1,5 +1,6 @@
 """FastAPI 메인 애플리케이션 - V6"""
 
+import logging
 import smtplib
 from email.mime.text import MIMEText
 from contextlib import asynccontextmanager
@@ -14,17 +15,19 @@ from app.services.gemini import check_gemini
 from app.services.job_search import get_job_stats
 from app.services.subway import check_subway_service
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작/종료 시 실행"""
     # 시작 시
-    print(f"[JobChat API V6] 환경: {settings.ENVIRONMENT}")
-    print(f"[JobChat API V6] 프로젝트: {settings.GOOGLE_CLOUD_PROJECT}")
+    logger.info(f"환경: {settings.ENVIRONMENT}")
+    logger.info(f"프로젝트: {settings.GOOGLE_CLOUD_PROJECT}")
     init_firestore()
     yield
     # 종료 시
-    print("[JobChat API V6] 종료")
+    logger.info("서버 종료")
 
 
 app = FastAPI(

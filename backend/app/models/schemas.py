@@ -108,18 +108,3 @@ class StatsResponse(BaseModel):
     last_crawl: Optional[str]
 
 
-# ========== V4 하위 호환성 ==========
-
-class LoadMoreRequest(BaseModel):
-    """[V4 호환] 더 보기 요청 모델"""
-    conversation_id: str
-    page: int = 1
-    page_size: int = 20
-
-
-class LoadMoreResponse(BaseModel):
-    """[V4 호환] 더 보기 응답 모델"""
-    success: bool
-    jobs: List[JobItem]
-    pagination: Optional[PaginationInfo] = None
-    search_params: dict[str, Any] = Field(default_factory=dict)
