@@ -92,12 +92,19 @@ class JobKoreaScraper:
         "용산구": "I210", "은평구": "I220", "종로구": "I230", "중구": "I240", "중랑구": "I250",
     }
 
-    def __init__(self, num_workers: int = 2):
+    # 프록시 설정 (IPRoyal - Whitelist 모드)
+    # IP Whitelist에 현재 IP 등록 필요 (dashboard.iproyal.com)
+    PROXY_URL = "http://geo.iproyal.com:12321"
+
+    def __init__(self, num_workers: int = 2, use_proxy: bool = False):
         """
         Args:
-            num_workers: 병렬 워커 수 (기본 2, 최대 3 - 차단 방지)
+            num_workers: 병렬 워커 수 (기본 2, 프록시 없이 최대 3)
+            use_proxy: 프록시 사용 여부 (True면 최대 30 워커 허용)
         """
-        self.num_workers = min(num_workers, 3)  # 최대 3개로 제한 (차단 방지)
+        self.use_proxy = use_proxy
+        max_workers = 30 if use_proxy else 3
+        self.num_workers = min(num_workers, max_workers)
         self.stats = CrawlerStats()
         self.clients: List[httpx.AsyncClient] = []
         self._setup_clients()
@@ -107,8 +114,11 @@ class JobKoreaScraper:
         self.dedup_generator = DedupKeyGenerator()
 
     def _setup_clients(self):
-        """워커별 HTTP 클라이언트 설정 (각각 다른 User-Agent)"""
+        """워커별 HTTP 클라이언트 설정 (프록시 지원)"""
         for i in range(self.num_workers):
+            # 프록시 설정 (Whitelist 모드 - 인증 불필요)
+            proxy_url = self.PROXY_URL if self.use_proxy else None
+
             client = httpx.AsyncClient(
                 timeout=30.0,
                 headers={
@@ -119,6 +129,7 @@ class JobKoreaScraper:
                     "Connection": "keep-alive",
                 },
                 follow_redirects=True,
+                proxy=proxy_url,
             )
             self.clients.append(client)
 
@@ -152,7 +163,8 @@ class JobKoreaScraper:
         max_pages = max_pages or 10000
         end_page = start_page + max_pages
 
-        print(f"[Crawler] 병렬 크롤링 시작 (워커: {self.num_workers}개)", flush=True)
+        proxy_status = "프록시 ON (IPRoyal)" if self.use_proxy else "프록시 OFF"
+        print(f"[Crawler] 병렬 크롤링 시작 (워커: {self.num_workers}개, {proxy_status})", flush=True)
         print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초", flush=True)
         print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page - 1}", flush=True)
 
