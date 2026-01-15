@@ -3,7 +3,6 @@
 서울시 전체 채용공고 크롤링 스크립트
 - 워커 2개, 병렬 5개, 딜레이 1초
 - 10페이지씩 배치 처리, 배치 간 10분 휴식
-- 30일 이내 공고만 수집
 """
 import asyncio
 import sys
@@ -121,8 +120,8 @@ async def main():
     print("크롤링 완료", flush=True)
     print("=" * 60, flush=True)
     print(f"총 소요 시간: {total_elapsed:.1f}분 ({total_elapsed/60:.1f}시간)", flush=True)
-    print(f"총 수집 (30일 이내): {total_collected}건", flush=True)
-    print(f"총 스킵 (30일 이전): {total_skipped}건", flush=True)
+    print(f"총 수집: {total_collected}건", flush=True)
+    print(f"총 스킵: {total_skipped}건", flush=True)
     print(f"DB 저장: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건", flush=True)
     print(f"최종 DB 공고 수: {get_db_count()}건", flush=True)
     print("=" * 60, flush=True)

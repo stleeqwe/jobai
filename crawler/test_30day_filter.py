@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""30일 필터링 크롤러 테스트 스크립트"""
+"""크롤러 테스트 스크립트"""
 
 import asyncio
 import sys
@@ -14,7 +14,7 @@ from app.scrapers.jobkorea import JobKoreaScraper
 
 async def main():
     print("=" * 60)
-    print("30일 필터링 크롤러 테스트")
+    print("크롤러 테스트")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 
@@ -36,7 +36,7 @@ async def main():
         summary = scraper.stats.summary()
         print(f"\n[통계]")
         print(f"  - 수집된 공고: {job_count}건")
-        print(f"  - 30일 이전 스킵: {summary['total_skipped']}건")
+        print(f"  - 스킵: {summary['total_skipped']}건")
         print(f"  - 실패: {summary['total_failed']}건")
         print(f"  - 차단 감지: {'예' if summary['is_blocked'] else '아니오'}")
         print(f"  - 소요 시간: {summary['elapsed_seconds']}초 ({summary['elapsed_minutes']}분)")

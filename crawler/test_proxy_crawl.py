@@ -36,7 +36,7 @@ async def test_proxy_connection():
         summary = scraper.stats.summary()
         print(f"\n[통계]")
         print(f"  - 수집된 공고: {job_count}건")
-        print(f"  - 30일 이전 스킵: {summary['total_skipped']}건")
+        print(f"  - 스킵: {summary['total_skipped']}건")
         print(f"  - 실패: {summary['total_failed']}건")
         print(f"  - 차단 감지: {'예' if summary['is_blocked'] else '아니오'}")
 
@@ -87,7 +87,7 @@ async def main():
         summary = scraper.stats.summary()
         print(f"\n[통계]")
         print(f"  - 수집된 공고: {job_count}건")
-        print(f"  - 30일 이전 스킵: {summary['total_skipped']}건")
+        print(f"  - 스킵: {summary['total_skipped']}건")
         print(f"  - 실패: {summary['total_failed']}건")
         print(f"  - 차단 감지: {'예' if summary['is_blocked'] else '아니오'}")
         print(f"  - 소요 시간: {summary['elapsed_seconds']}초 ({summary['elapsed_minutes']}분)")

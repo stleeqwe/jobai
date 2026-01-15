@@ -36,7 +36,7 @@ async def main():
 
         stats = scraper.stats.summary()
         print(f"  - 수집: {job_count}건")
-        print(f"  - 스킵 (30일 이전): {stats['total_skipped']}건")
+        print(f"  - 스킵: {stats['total_skipped']}건")
         print(f"  - 실패: {stats['total_failed']}건")
         print(f"  - 저장: 신규 {save_stats.get('new', 0)}건, 업데이트 {save_stats.get('updated', 0)}건")
         print(f"  - 소요 시간: {stats['elapsed_minutes']}분")
