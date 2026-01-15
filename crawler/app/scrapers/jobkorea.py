@@ -3,6 +3,7 @@
 import asyncio
 import random
 import re
+import time
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 from bs4 import BeautifulSoup
@@ -12,6 +13,10 @@ from app.config import settings, USER_AGENTS
 from app.normalizers import normalize_job_type, get_job_category, get_mvp_category, normalize_location, parse_salary
 from app.normalizers.company import CompanyNormalizer, normalize_company
 from app.normalizers.dedup import DedupKeyGenerator, generate_dedup_key
+from app.logging_config import (
+    get_logger, log_http_request, log_http_response, log_http_error,
+    log_parse_result, log_parse_summary, log_timing
+)
 
 # NOTE: nearest_station 계산은 후처리 배치로 이동 (scripts/enrich_nearest_station.py)
 
@@ -90,9 +95,12 @@ class JobKoreaScraper:
         "용산구": "I210", "은평구": "I220", "종로구": "I230", "중구": "I240", "중랑구": "I250",
     }
 
-    # 프록시 설정 (IPRoyal - Whitelist 모드)
-    # IP Whitelist에 현재 IP 등록 필요 (dashboard.iproyal.com)
-    PROXY_URL = "http://geo.iproyal.com:12321"
+    # 프록시 설정 (IPRoyal - Username/Password 인증 + Random Rotation)
+    # Random rotation: 세션 파라미터 없음 = 매 요청마다 새 IP
+    PROXY_HOST = "geo.iproyal.com"
+    PROXY_PORT = 12321
+    PROXY_USERNAME = "wjmD9FjEss6TCmTC"
+    PROXY_PASSWORD = "PFZsSKOcUmfIb0Kj"
 
     def __init__(self, num_workers: int = 2, use_proxy: bool = False):
         """
@@ -105,17 +113,25 @@ class JobKoreaScraper:
         self.num_workers = min(num_workers, max_workers)
         self.stats = CrawlerStats()
         self.clients: List[httpx.AsyncClient] = []
+        self.list_client: Optional[httpx.AsyncClient] = None
         self._setup_clients()
+        if self.use_proxy:
+            self._setup_list_client()
 
         # Phase 1: Normalizer 인스턴스
         self.company_normalizer = CompanyNormalizer()
         self.dedup_generator = DedupKeyGenerator()
 
+        # 로거 초기화
+        self.logger = get_logger("crawler.jobkorea")
+
     def _setup_clients(self):
         """워커별 HTTP 클라이언트 설정 (프록시 지원)"""
         for i in range(self.num_workers):
-            # 프록시 설정 (Whitelist 모드 - 인증 불필요)
-            proxy_url = self.PROXY_URL if self.use_proxy else None
+            # 프록시 설정 (Username/Password 인증 + Random Rotation)
+            proxy_url = None
+            if self.use_proxy:
+                proxy_url = f"http://{self.PROXY_USERNAME}:{self.PROXY_PASSWORD}@{self.PROXY_HOST}:{self.PROXY_PORT}"
 
             client = httpx.AsyncClient(
                 timeout=30.0,
@@ -131,10 +147,46 @@ class JobKoreaScraper:
             )
             self.clients.append(client)
 
+    def _setup_list_client(self):
+        """리스트 페이지용 클라이언트 (프록시 OFF + 캐시 무력화 헤더)"""
+        self.list_client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={
+                "User-Agent": USER_AGENTS[0],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+            follow_redirects=True,
+        )
+
     async def close(self):
         """모든 클라이언트 종료"""
         for client in self.clients:
             await client.aclose()
+        if self.list_client:
+            await self.list_client.aclose()
+
+    def _get_list_client(self, fallback_client: httpx.AsyncClient) -> httpx.AsyncClient:
+        """리스트 페이지 요청용 클라이언트 선택"""
+        return self.list_client or fallback_client
+
+    def _build_list_params(self, page: int, orderby: str = "") -> dict:
+        """리스트 페이지 요청 파라미터 구성 (프록시 캐시 무력화 포함)"""
+        params = {
+            "menucode": "local",
+            "local": self.TARGET_LOCAL_CODE,
+            "page": page,
+            "_t": int(time.time() * 1000),
+        }
+        if orderby:
+            params["orderby"] = orderby
+        if self.use_proxy:
+            params["_cb"] = random.randint(0, 999999)
+        return params
 
     # ========== 전체 크롤링 (병렬) ==========
 
@@ -162,6 +214,14 @@ class JobKoreaScraper:
         end_page = start_page + max_pages
 
         proxy_status = "프록시 ON (IPRoyal)" if self.use_proxy else "프록시 OFF"
+
+        # 로깅: 크롤링 시작
+        self.logger.info(f"[CRAWL START] 병렬 크롤링 시작")
+        self.logger.info(f"  - 워커: {self.num_workers}개, {proxy_status}")
+        self.logger.info(f"  - 요청 간격: {settings.CRAWL_DELAY_SECONDS}초")
+        self.logger.info(f"  - 페이지 범위: {start_page} ~ {end_page - 1}")
+        self.logger.info(f"  - 저장 배치 크기: {save_batch_size}건")
+
         print(f"[Crawler] 병렬 크롤링 시작 (워커: {self.num_workers}개, {proxy_status})", flush=True)
         print(f"[Crawler] 요청 간격: {settings.CRAWL_DELAY_SECONDS}초", flush=True)
         print(f"[Crawler] 페이지 범위: {start_page} ~ {end_page - 1}", flush=True)
@@ -306,6 +366,20 @@ class JobKoreaScraper:
         print(f"[Crawler] 통계: {self.stats.summary()}", flush=True)
         print(f"[Crawler] 저장: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건", flush=True)
 
+        # 로깅: 크롤링 완료 요약
+        stats = self.stats.summary()
+        self.logger.info(f"[CRAWL END] 크롤링 완료")
+        self.logger.info(f"  - 수집: {total_collected}건")
+        self.logger.info(f"  - 고유 ID: {len(collected_ids)}건")
+        self.logger.info(f"  - 스킵: {stats['total_skipped']}건")
+        self.logger.info(f"  - 실패: {stats['total_failed']}건 ({stats['failure_rate']})")
+        self.logger.info(f"  - 저장: 신규 {total_saved['new']}건, 업데이트 {total_saved['updated']}건")
+        self.logger.info(f"  - 소요 시간: {stats['elapsed_minutes']}분")
+        self.logger.info(f"  - 차단 감지: {'예' if stats['is_blocked'] else '아니오'}")
+
+        if stats['recent_errors']:
+            self.logger.warning(f"  - 최근 에러: {stats['recent_errors']}")
+
         # 메모리 최적화: 전체 dict 대신 ID 세트만 반환
         return total_collected, collected_ids, total_saved
 
@@ -322,22 +396,25 @@ class JobKoreaScraper:
             worker_id: 워커 ID
             parallel_batch_size: 병렬 호출 배치 크기 (기본 5)
         """
-        params = {
-            "menucode": "local",
-            "local": self.TARGET_LOCAL_CODE,
-            "page": page,
-        }
+        page_start_time = time.perf_counter()
+        self.logger.debug(f"[Worker-{worker_id}] 페이지 {page} 크롤링 시작")
 
-        response = await self._fetch_with_retry(client, self.LIST_URL, params=params)
+        params = self._build_list_params(page)
+        list_client = self._get_list_client(client)
+        response = await self._fetch_with_retry(list_client, self.LIST_URL, params=params)
         if not response:
+            self.logger.warning(f"[Worker-{worker_id}] 페이지 {page}: 응답 없음")
             return None
 
         # 차단 감지
         if self._detect_blocking(response):
             self.stats.blocked_detected = True
+            self.logger.error(f"[Worker-{worker_id}] 페이지 {page}: 차단 감지!")
             return None
 
-        soup = BeautifulSoup(response.text, "lxml")
+        # HTML 파싱
+        with log_timing(f"Worker-{worker_id} 페이지 {page} HTML 파싱", self.logger):
+            soup = BeautifulSoup(response.text, "lxml")
 
         # 셀렉터 우선순위: li.devloopArea (663건) > li.job-recommendation-item (3건)
         job_items = soup.select("li.devloopArea")
@@ -345,31 +422,45 @@ class JobKoreaScraper:
             job_items = soup.select("li.job-recommendation-item")
 
         if not job_items:
+            self.logger.info(f"[Worker-{worker_id}] 페이지 {page}: 공고 없음 (마지막 페이지)")
             return None  # 더 이상 공고 없음
+
+        self.logger.debug(f"[Worker-{worker_id}] 페이지 {page}: {len(job_items)}개 아이템 발견")
 
         # 1단계: 모든 아이템에서 기본 정보 파싱
         parsed_jobs = []
+        parse_failed = 0
         for item in job_items:
             try:
                 job = self._parse_job_item(item)
                 if job and job.get("id"):
                     parsed_jobs.append(job)
+                    # 첫 3개 공고 샘플 로깅
+                    if len(parsed_jobs) <= 3:
+                        log_parse_result(self.logger, job["id"], job)
             except Exception as e:
-                if settings.DEBUG:
-                    print(f"[Worker-{worker_id}] 아이템 파싱 실패: {e}")
+                parse_failed += 1
+                self.logger.debug(f"[Worker-{worker_id}] 아이템 파싱 실패: {e}")
                 continue
 
         # 2단계: 상세 페이지 병렬 호출 (배치 단위)
+        detail_failed = 0
+
         async def fetch_detail_with_delay(job: Dict, batch_idx: int) -> Dict:
             """상세 정보 가져오기 (배치 내 딜레이 적용)"""
+            nonlocal detail_failed
             try:
                 job_id = job["id"].replace("jk_", "")
                 detail_info = await self._fetch_detail_info(client, job_id)
                 if detail_info:
                     job.update(detail_info)
+                    self.logger.debug(f"[Worker-{worker_id}] 상세 정보 성공: {job_id}")
+                else:
+                    detail_failed += 1
+                    self.logger.debug(f"[Worker-{worker_id}] 상세 정보 없음: {job_id}")
             except Exception as e:
-                if settings.DEBUG:
-                    print(f"[Worker-{worker_id}] 상세 정보 실패 ({job['id']}): {e}")
+                detail_failed += 1
+                self.logger.warning(f"[Worker-{worker_id}] 상세 정보 실패 ({job['id']}): {e}")
             return job
 
         jobs = []
@@ -391,6 +482,11 @@ class JobKoreaScraper:
             # 배치 간 딜레이 (차단 방지)
             if batch_start + parallel_batch_size < len(parsed_jobs):
                 await asyncio.sleep(0.8 + random.uniform(0.2, 0.4))  # 0.8~1.2초
+
+        # 페이지 파싱 요약 로깅
+        page_elapsed = time.perf_counter() - page_start_time
+        log_parse_summary(self.logger, page, len(job_items), len(jobs), parse_failed + detail_failed)
+        self.logger.debug(f"[Worker-{worker_id}] 페이지 {page} 완료: {page_elapsed:.1f}초")
 
         return jobs
 
@@ -415,14 +511,9 @@ class JobKoreaScraper:
 
         while len(all_jobs) < count:
             try:
-                params = {
-                    "menucode": "local",
-                    "local": self.TARGET_LOCAL_CODE,
-                    "page": page,
-                    "orderby": "reg",  # 최신순 정렬
-                }
-
-                response = await self._fetch_with_retry(client, self.LIST_URL, params=params)
+                params = self._build_list_params(page, orderby="reg")
+                list_client = self._get_list_client(client)
+                response = await self._fetch_with_retry(list_client, self.LIST_URL, params=params)
                 if not response:
                     break
 
@@ -558,12 +649,21 @@ class JobKoreaScraper:
         """지수 백오프 재시도 로직"""
         for attempt in range(max_retries):
             try:
+                # HTTP 요청 로깅
+                log_http_request(self.logger, "GET", url, params, attempt + 1)
+                start_time = time.perf_counter()
+
                 response = await client.get(url, params=params)
+                elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+                # HTTP 응답 로깅
+                content_length = len(response.content) if response.content else 0
+                log_http_response(self.logger, url, response.status_code, content_length, elapsed_ms)
 
                 # 429 Too Many Requests
                 if response.status_code == 429:
                     wait_time = 2 ** (attempt + 2)  # 4, 8, 16초
-                    print(f"[Crawler] Rate limited, {wait_time}초 대기...")
+                    self.logger.warning(f"[HTTP] Rate limited, {wait_time}초 대기...")
                     await asyncio.sleep(wait_time)
                     continue
 
@@ -571,6 +671,7 @@ class JobKoreaScraper:
                 return response
 
             except httpx.HTTPStatusError as e:
+                log_http_error(self.logger, url, e, attempt + 1, max_retries)
                 if e.response.status_code == 404:
                     return None
                 if attempt == max_retries - 1:
@@ -578,7 +679,8 @@ class JobKoreaScraper:
                 wait_time = 2 ** attempt  # 1, 2, 4초
                 await asyncio.sleep(wait_time)
 
-            except httpx.RequestError:
+            except httpx.RequestError as e:
+                log_http_error(self.logger, url, e, attempt + 1, max_retries)
                 if attempt == max_retries - 1:
                     raise
                 wait_time = 2 ** attempt
@@ -612,11 +714,27 @@ class JobKoreaScraper:
             title = title_match.group(1) if title_match else ""
 
             job_keywords_pattern = [
-                "개발자", "디자이너", "마케터", "기획자", "영업", "PM", "PO",
-                "백엔드", "프론트엔드", "풀스택", "데이터", "AI", "ML",
-                "바리스타", "매니저", "관리자", "엔지니어", "분석가",
-                "회계", "인사", "총무", "비서", "CS", "상담사", "연구원",
-                "사무", "경리", "교사", "강사", "의사", "간호사", "약사"
+                # 개발 직군
+                "개발자", "개발", "Developer", "Engineer", "엔지니어",
+                "백엔드", "Backend", "서버개발", "서버",
+                "프론트엔드", "Frontend", "프론트", "웹개발", "웹퍼블리셔", "퍼블리셔",
+                "풀스택", "Fullstack",
+                "앱개발", "앱", "모바일개발", "모바일", "iOS", "안드로이드", "Android", "Flutter", "React Native",
+                "데이터", "Data", "빅데이터", "데이터분석", "분석가",
+                "AI", "ML", "인공지능", "머신러닝", "딥러닝",
+                "DevOps", "데브옵스", "SRE", "인프라", "클라우드",
+                "QA", "테스터", "테스트",
+                # 디자인 직군
+                "디자이너", "디자인", "Designer", "UI", "UX", "UIUX", "웹디자인", "그래픽", "영상",
+                # 기획/PM 직군
+                "기획자", "기획", "PM", "PO", "프로덕트", "서비스기획", "전략기획", "사업기획",
+                # 마케팅 직군
+                "마케터", "마케팅", "퍼포먼스", "콘텐츠", "브랜드", "CRM", "그로스",
+                # 경영지원 직군
+                "회계", "인사", "총무", "비서", "경리", "재무", "법무", "HR",
+                # 기타 직군
+                "영업", "CS", "상담사", "연구원", "사무", "매니저", "관리자",
+                "바리스타", "교사", "강사", "의사", "간호사", "약사"
             ]
 
             title_keywords = [kw for kw in job_keywords_pattern if kw in title]
@@ -975,4 +1093,3 @@ class JobKoreaScraper:
             return "경력", None, None
 
         return "경력무관", None, None
-

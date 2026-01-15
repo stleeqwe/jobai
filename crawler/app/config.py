@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
+    # Logging
+    LOG_LEVEL: str = "DEBUG"  # DEBUG, INFO, WARNING, ERROR
+    LOG_FILE: Optional[str] = None  # 파일 로깅 경로 (None이면 콘솔만)
+
     class Config:
         env_file = ".env"
         extra = "ignore"

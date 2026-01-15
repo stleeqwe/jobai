@@ -58,26 +58,34 @@ async def enrich_nearest_station(
     print(f"[Enrich] 설정: limit={limit}, batch_size={batch_size}, force={force}")
 
     # nearest_station이 없는 활성 공고 조회
+    # Firestore는 "필드 없음" 쿼리를 지원하지 않으므로 Python에서 필터링
     if force:
         query = db.collection("jobs").where("is_active", "==", True).limit(limit)
+        docs = list(query.stream())
+        print(f"[Enrich] 처리 대상 (force): {len(docs)}건")
     else:
-        # nearest_station이 없거나 빈 문자열인 공고
-        query = (
+        # 1. 빈 문자열인 공고
+        query1 = (
             db.collection("jobs")
             .where("is_active", "==", True)
             .where("nearest_station", "==", "")
             .limit(limit)
         )
+        empty_docs = list(query1.stream())
+        print(f"[Enrich] nearest_station 빈 문자열: {len(empty_docs)}건")
 
-    docs = list(query.stream())
-    print(f"[Enrich] 처리 대상: {len(docs)}건")
+        # 2. 필드 자체가 없는 공고 (Python 필터링)
+        remaining = limit - len(empty_docs)
+        if remaining > 0:
+            query2 = db.collection("jobs").where("is_active", "==", True).limit(limit * 3)
+            all_docs = list(query2.stream())
+            missing_docs = [d for d in all_docs if "nearest_station" not in d.to_dict()][:remaining]
+            print(f"[Enrich] nearest_station 필드 없음: {len(missing_docs)}건")
+            docs = empty_docs + missing_docs
+        else:
+            docs = empty_docs
 
-    if not docs:
-        # nearest_station 필드 자체가 없는 경우도 조회
-        query2 = db.collection("jobs").where("is_active", "==", True).limit(limit * 2)
-        all_docs = list(query2.stream())
-        docs = [d for d in all_docs if "nearest_station" not in d.to_dict()][:limit]
-        print(f"[Enrich] nearest_station 필드 없는 공고: {len(docs)}건")
+        print(f"[Enrich] 총 처리 대상: {len(docs)}건")
 
     if not docs:
         print("[Enrich] 처리할 공고 없음")

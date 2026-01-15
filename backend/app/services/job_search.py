@@ -20,7 +20,7 @@ DUMMY_JOBS_PATH = Path(__file__).parent.parent / "data" / "dummy_jobs.json"
 
 async def search_jobs_with_commute(
     job_keywords: List[str],
-    salary_min: int,
+    salary_min: Optional[int] = None,
     commute_origin: str = "",
     commute_max_minutes: Optional[int] = None,
     salary_max: Optional[int] = None,
@@ -47,10 +47,13 @@ async def search_jobs_with_commute(
     logger.info(f"검색 시작: keywords={job_keywords}, salary={salary_min}+, "
                 f"company_loc={company_location}, commute_max={commute_max_minutes}")
 
+    # salary_min이 None이면 0으로 처리 (연봉 무관)
+    salary_min_val = salary_min if salary_min is not None else 0
+
     # 1. DB에서 직무+연봉+회사위치 필터링
     db_jobs = await _filter_from_db(
         job_keywords=job_keywords,
-        salary_min=salary_min,
+        salary_min=salary_min_val,
         salary_max=salary_max,
         company_location=company_location
     )
@@ -161,6 +164,7 @@ def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
     job_type_raw = job.get("job_type_raw", "").lower()
     job_keywords_field = [k.lower() for k in job.get("job_keywords", [])]
     search_text = f"{title} {job_type_raw}"
+    search_text_no_space = search_text.replace(" ", "")  # 공백 제거 버전
 
     # 각 키워드를 통째로 매칭 (AI가 이미 확장해줌)
     for keyword in keywords:
@@ -171,8 +175,8 @@ def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
         # 공백 제거 버전도 생성 (웹 디자이너 → 웹디자이너)
         kw_no_space = kw.replace(" ", "")
 
-        # 1. 키워드가 title이나 job_type_raw에 포함되는지
-        if kw in search_text or kw_no_space in search_text:
+        # 1. 키워드가 title이나 job_type_raw에 포함되는지 (공백 유무 모두 체크)
+        if kw in search_text or kw_no_space in search_text or kw_no_space in search_text_no_space:
             return True
 
         # 2. job_keywords 필드에 포함되는지

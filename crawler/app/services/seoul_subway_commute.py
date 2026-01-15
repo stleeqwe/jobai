@@ -196,7 +196,7 @@ class SeoulSubwayCommute:
             "영등포구": "line2_영등포구청역",
             "구로구": "line2_구로디지털단지역",
             "금천구": "line7_가산디지털단지역",
-            "양천구": "line2_신정역",
+            "양천구": "line5_신정역",
             "강서구": "line5_발산역",
             "동작구": "line4_총신대입구역",
             "관악구": "line2_서울대입구역",
@@ -505,6 +505,17 @@ class SeoulSubwayCommute:
         # 3. 구/동 이름으로 대표역
         for district, station_id in self.district_stations.items():
             if district in location:
+                station = self.stations.get(station_id)
+                if station:
+                    return (station.get('lat', 0), station.get('lng', 0))
+
+        # 4. 주소에서 역명 추출 (예: "서울특별시 논현역앞" → "논현역")
+        import re
+        station_match = re.search(r'([가-힣]+역)', location)
+        if station_match:
+            extracted_station = station_match.group(1)
+            station_id = self._find_station_by_name(extracted_station)
+            if station_id:
                 station = self.stations.get(station_id)
                 if station:
                     return (station.get('lat', 0), station.get('lng', 0))
