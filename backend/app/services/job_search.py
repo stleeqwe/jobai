@@ -33,7 +33,7 @@ async def search_jobs_with_commute(
         job_keywords: 직무 키워드 리스트
         salary_min: 최소 연봉 (만원), 무관이면 0
         commute_origin: 통근 기준점 (사용자 현재 위치)
-        commute_max_minutes: 최대 통근시간 (분), None이면 통근시간 계산 안 함
+        commute_max_minutes: 최대 통근시간 (분), None이면 통근시간 계산만 수행
         salary_max: 최대 연봉 (선택)
         company_location: 회사 위치 필터 (예: "강남역", "서초구")
 
@@ -62,31 +62,38 @@ async def search_jobs_with_commute(
     if not db_jobs:
         return {"jobs": [], "total_count": 0, "filtered_by_commute": 0}
 
-    # 2. 통근시간 필터가 있을 때만 계산
-    if commute_max_minutes is not None and commute_origin:
+    # 2. 사용자 위치가 있으면 항상 통근시간 계산
+    if commute_origin:
         jobs_with_commute = await _calculate_commute_times(
             jobs=db_jobs,
             origin=commute_origin,
             max_minutes=commute_max_minutes
         )
-        logger.info(f"통근시간 필터 결과: {len(jobs_with_commute)}건")
 
-        # 통근시간순 정렬
-        jobs_with_commute.sort(key=lambda x: x.get("commute_minutes", 999))
+        if commute_max_minutes is not None:
+            logger.info(f"통근시간 필터 결과: {len(jobs_with_commute)}건")
+            # 통근시간순 정렬
+            jobs_with_commute.sort(key=lambda x: x.get("commute_minutes", 999))
+            return {
+                "jobs": jobs_with_commute,
+                "total_count": len(jobs_with_commute),
+                "filtered_by_commute": len(db_jobs) - len(jobs_with_commute)
+            }
 
+        logger.info("통근시간 계산만 수행 - 필터 없음")
         return {
             "jobs": jobs_with_commute,
             "total_count": len(jobs_with_commute),
-            "filtered_by_commute": len(db_jobs) - len(jobs_with_commute)
-        }
-    else:
-        # 통근시간 필터 없음 - DB 결과 그대로 반환
-        logger.info("통근시간 필터 없음 - DB 결과 그대로 반환")
-        return {
-            "jobs": db_jobs,
-            "total_count": len(db_jobs),
             "filtered_by_commute": 0
         }
+
+    # 통근 기준점이 없으면 기존 결과 반환
+    logger.info("통근 기준점 없음 - DB 결과 그대로 반환")
+    return {
+        "jobs": db_jobs,
+        "total_count": len(db_jobs),
+        "filtered_by_commute": 0
+    }
 
 
 async def _filter_from_db(
@@ -119,13 +126,15 @@ async def _filter_from_db(
         # Firestore는 복잡한 OR 쿼리 제한 → 전체 조회 후 Python 필터
         # (향후 최적화: job_category 인덱스 활용)
 
-        jobs = []
+        jobs_with_scores = []
+        seen = 0
         # 충분한 후보를 확보하기 위해 넉넉하게 조회 (필터링 후 limit 적용)
         async for doc in query.limit(limit * 10).stream():
             job = doc.to_dict()
 
             # 직무 키워드 매칭
-            if not _matches_keywords(job, job_keywords):
+            match_score = _keyword_match_score(job, job_keywords)
+            if match_score == 0:
                 continue
 
             # 연봉 필터
@@ -136,55 +145,76 @@ async def _filter_from_db(
             if company_location and not _matches_company_location(job, company_location):
                 continue
 
-            jobs.append(job)
+            jobs_with_scores.append((match_score, seen, job))
+            seen += 1
 
-            if len(jobs) >= limit:
+            if len(jobs_with_scores) >= limit:
                 break
 
-        return jobs
+        # 제목 매칭 우선으로 정렬 (score 내림차순, 입력 순서 유지)
+        jobs_with_scores.sort(key=lambda item: (-item[0], item[1]))
+        return [job for _, __, job in jobs_with_scores]
 
     except Exception as e:
         logger.error(f"DB 조회 오류: {e}")
         return []
 
 
-def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
+def _keyword_match_score(job: Dict, keywords: List[str]) -> int:
     """
-    직무 키워드 매칭 (AI 확장 키워드 기반)
+    직무 키워드 매칭 스코어
 
-    AI가 유사어/동의어를 확장해서 전달하므로 키워드를 통째로 매칭.
-    - ["웹디자이너", "UI디자이너", "웹퍼블리셔"] 중 하나라도 매칭되면 True
-    - 공백 제거 버전도 함께 매칭 (웹 디자이너 → 웹디자이너)
+    우선순위:
+    - title 매칭: 3점
+    - job_type_raw 매칭: 2점
+    - job_keywords 매칭: 1점
     """
     if not keywords:
-        return True
+        return 1
 
-    # 매칭 대상 텍스트
     title = job.get("title", "").lower()
     job_type_raw = job.get("job_type_raw", "").lower()
     job_keywords_field = [k.lower() for k in job.get("job_keywords", [])]
     search_text = f"{title} {job_type_raw}"
-    search_text_no_space = search_text.replace(" ", "")  # 공백 제거 버전
+    search_text_no_space = search_text.replace(" ", "")
 
-    # 각 키워드를 통째로 매칭 (AI가 이미 확장해줌)
+    title_matched = False
+    job_type_matched = False
+    keywords_matched = False
+
     for keyword in keywords:
         kw = keyword.lower().strip()
         if len(kw) < 2:
             continue
 
-        # 공백 제거 버전도 생성 (웹 디자이너 → 웹디자이너)
         kw_no_space = kw.replace(" ", "")
 
-        # 1. 키워드가 title이나 job_type_raw에 포함되는지 (공백 유무 모두 체크)
         if kw in search_text or kw_no_space in search_text or kw_no_space in search_text_no_space:
-            return True
+            if kw in title or kw_no_space in title or kw_no_space in title.replace(" ", ""):
+                title_matched = True
+            if kw in job_type_raw or kw_no_space in job_type_raw or kw_no_space in job_type_raw.replace(" ", ""):
+                job_type_matched = True
 
-        # 2. job_keywords 필드에 포함되는지
-        for jk in job_keywords_field:
-            if kw in jk or kw_no_space in jk or jk in kw or jk in kw_no_space:
-                return True
+        if not keywords_matched:
+            for jk in job_keywords_field:
+                if kw in jk or kw_no_space in jk or jk in kw or jk in kw_no_space:
+                    keywords_matched = True
+                    break
 
-    return False
+    score = 0
+    if title_matched:
+        score += 3
+    if job_type_matched:
+        score += 2
+    if keywords_matched:
+        score += 1
+
+    return score
+
+
+def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
+    """직무 키워드 매칭 여부"""
+    return _keyword_match_score(job, keywords) > 0
 
 
 def _matches_salary(job: Dict, salary_min: int, salary_max: Optional[int]) -> bool:
@@ -283,10 +313,10 @@ def _matches_company_location(job: Dict, company_location: str) -> bool:
 async def _calculate_commute_times(
     jobs: List[JobDict],
     origin: str,
-    max_minutes: int
+    max_minutes: Optional[int]
 ) -> List[JobDict]:
     """
-    통근시간 계산 및 필터링
+    통근시간 계산 및 (옵션) 필터링
 
     지하철 모듈 기반:
     1. 출발지 → 가장 가까운 역 (도보)
@@ -305,29 +335,33 @@ async def _calculate_commute_times(
         job_location = job.get("location_full") or job.get("location_gugun", "")
 
         if not job_location:
+            if max_minutes is None:
+                results.append(dict(job))
             continue
 
         # 통근시간 계산
         commute = subway_service.calculate(origin, job_location)
 
         if commute is None:
-            # 계산 실패 → 제외 (또는 포함하고 "시간 미상"으로 처리)
+            if max_minutes is None:
+                results.append(dict(job))
             continue
 
         commute_minutes = commute.get("minutes", 999)
 
-        # 최대 시간 필터
-        if commute_minutes <= max_minutes:
-            job_copy = dict(job)
-            job_copy["commute_minutes"] = commute_minutes
-            job_copy["commute_text"] = commute.get("text", f"{commute_minutes}분")
-            job_copy["commute_detail"] = {
-                "origin_station": commute.get("origin_station"),
-                "dest_station": commute.get("destination_station"),
-                "origin_walk": commute.get("origin_walk", 0),
-                "dest_walk": commute.get("destination_walk", 0)
-            }
-            results.append(job_copy)
+        if max_minutes is not None and commute_minutes > max_minutes:
+            continue
+
+        job_copy = dict(job)
+        job_copy["commute_minutes"] = commute_minutes
+        job_copy["commute_text"] = commute.get("text", f"{commute_minutes}분")
+        job_copy["commute_detail"] = {
+            "origin_station": commute.get("origin_station"),
+            "dest_station": commute.get("destination_station"),
+            "origin_walk": commute.get("origin_walk", 0),
+            "dest_walk": commute.get("destination_walk", 0)
+        }
+        results.append(job_copy)
 
     return results
 
@@ -438,5 +472,3 @@ def _get_dummy_jobs() -> List[JobDict]:
     except json.JSONDecodeError as e:
         logger.error(f"더미 데이터 파싱 오류: {e}")
         return []
-
-

@@ -750,6 +750,33 @@ class JobKoreaScraper:
 
             job_types = valid_work_fields if valid_work_fields else title_keywords
 
+            # 제목 토큰을 job_keywords에 병합해 매칭 범위를 확장
+            stopwords = {
+                "채용", "모집", "신입", "경력", "경력무관", "인턴", "정규직", "계약직",
+                "수습", "모집중", "모집요강", "채용공고", "모집공고", "긴급", "급구",
+                "우대", "가능", "담당", "업무", "직원", "구인", "사원", "신규", "전환",
+                "잡코리아", "jobkorea"
+            }
+            title_tokens = []
+            for raw_token in re.split(r"\s+", title):
+                token = re.sub(r"[^0-9a-zA-Z가-힣+#]", "", raw_token)
+                if len(token) < 2:
+                    continue
+                if token in stopwords:
+                    continue
+                title_tokens.append(token)
+
+            job_keywords = []
+            seen_keywords = set()
+            for keyword in job_types + title_tokens:
+                kw = keyword.strip()
+                if not kw or kw in stopwords:
+                    continue
+                if kw in seen_keywords:
+                    continue
+                seen_keywords.add(kw)
+                job_keywords.append(kw)
+
             # 4. 급여 정보 추출 (여러 패턴 시도)
             salary_text = ""
             salary_patterns = [
@@ -872,7 +899,7 @@ class JobKoreaScraper:
                 "job_type_raw": ", ".join(job_types[:3]),
                 "job_category": category,
                 "mvp_category": mvp_category,
-                "job_keywords": job_types[:5],
+                "job_keywords": job_keywords[:7],
                 "industry": "",
                 "salary_text": salary_data["text"],
                 "salary_min": salary_data["min"],

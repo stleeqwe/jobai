@@ -38,6 +38,9 @@ class SeoulSubwayCommute:
     # 대기 시간 버퍼 (분)
     WAITING_BUFFER = 5
 
+    # 최소 통근 베이스 시간 (분) - 동일 구/인접 지역도 최소 이동시간 반영
+    BASE_COMMUTE_MINUTES = 10
+
     # 최대 도보 시간 (분)
     MAX_WALKING_MINUTES = 30
 
@@ -257,7 +260,7 @@ class SeoulSubwayCommute:
             direct_walk = self._calculate_walking_time(
                 from_lat, from_lng, to_lat, to_lng
             )
-            minutes = min(direct_walk, from_walk + to_walk)
+            minutes = self.BASE_COMMUTE_MINUTES + min(direct_walk, from_walk + to_walk)
             _, text = self._format_commute_time(minutes)
             return {
                 'minutes': minutes,
@@ -273,7 +276,13 @@ class SeoulSubwayCommute:
             return None
 
         # 총 시간 = 도보 + 지하철 + 도보 + 대기
-        total = from_walk + subway_time + to_walk + self.WAITING_BUFFER
+        total = (
+            self.BASE_COMMUTE_MINUTES
+            + from_walk
+            + subway_time
+            + to_walk
+            + self.WAITING_BUFFER
+        )
         _, text = self._format_commute_time(total)
 
         return {
