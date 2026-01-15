@@ -481,6 +481,31 @@ class JobKoreaScraperV2:
                     employment_type = emp
                     break
 
+        # 제목 토큰 추출하여 job_keywords에 병합
+        stopwords = {
+            "채용", "모집", "신입", "경력", "경력무관", "인턴", "정규직", "계약직",
+            "수습", "모집중", "모집요강", "채용공고", "모집공고", "긴급", "급구",
+            "우대", "가능", "담당", "업무", "직원", "구인", "사원", "신규", "전환",
+            "잡코리아", "jobkorea"
+        }
+        title_tokens = []
+        for raw_token in re.split(r"\s+", title):
+            token = re.sub(r"[^0-9a-zA-Z가-힣+#]", "", raw_token)
+            if len(token) >= 2 and token.lower() not in stopwords:
+                title_tokens.append(token)
+
+        # job_keywords 병합 (work_fields + 제목 토큰, 중복 제거)
+        job_keywords = []
+        seen_keywords = set()
+        for keyword in work_fields + title_tokens:
+            kw = keyword.strip()
+            if not kw or kw.lower() in stopwords:
+                continue
+            kw_lower = kw.lower()
+            if kw_lower not in seen_keywords:
+                job_keywords.append(kw)
+                seen_keywords.add(kw_lower)
+
         # 정규화
         primary_job_type = work_fields[0] if work_fields else ""
         normalized = normalize_job_type(primary_job_type) if primary_job_type else ""
@@ -508,7 +533,7 @@ class JobKoreaScraperV2:
             "job_type_raw": ", ".join(work_fields[:3]),
             "job_category": category,
             "mvp_category": mvp_category,
-            "job_keywords": work_fields[:5],
+            "job_keywords": job_keywords[:7],
             "location_sido": location_info.get("sido", "서울"),
             "location_gugun": location_info.get("gugun", ""),
             "location_dong": location_info.get("dong", ""),
