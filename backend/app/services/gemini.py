@@ -292,6 +292,25 @@ class GeminiService:
                 # 검색 실행
                 params = dict(function_call.args) if function_call.args else {}
 
+                # 후속 검색인 경우 이전 파라미터 병합 (직무가 동일/유사할 때)
+                # 이를 통해 "연봉 5000 이상만"처럼 일부 조건만 변경해도 이전 조건 유지
+                if memory.last_search_params:
+                    prev_keywords = set(k.lower() for k in memory.last_search_params.get("job_keywords", []))
+                    new_keywords = set(k.lower() for k in params.get("job_keywords", []))
+
+                    # 직무 키워드가 겹치면 후속 검색으로 판단
+                    keywords_overlap = bool(prev_keywords & new_keywords) if prev_keywords and new_keywords else False
+
+                    if keywords_overlap:
+                        logger.info(f"후속 검색 감지: 이전 params 병합 (overlap: {prev_keywords & new_keywords})")
+                        merged_params = {**memory.last_search_params}
+                        # 새로 지정된 파라미터로 덮어쓰기 (None이 아닌 값만)
+                        for key, value in params.items():
+                            if value is not None:
+                                merged_params[key] = value
+                        params = merged_params
+                        logger.info(f"병합 결과: {params}")
+
                 # 사용자 위치 (통근시간 계산용 - 항상 사용자 현재 위치 사용)
                 user_loc = getattr(memory, 'user_location', None) or user_location
                 commute_origin = ""
@@ -435,7 +454,8 @@ class GeminiService:
 
                 # 필터링 결과를 새로운 캐시로 저장
                 original_count = len(base_jobs)
-                memory.save_search(filtered_jobs, {**memory.last_search_params, **params})
+                merged_params = {**memory.last_search_params, **params}
+                memory.save_search(filtered_jobs, merged_params)
 
                 # 첫 50건만 LLM에 전달
                 first_batch = memory.get_next_batch(50)
@@ -478,7 +498,7 @@ class GeminiService:
                         "has_more": memory.has_more(),
                         "remaining": memory.get_remaining_count()
                     },
-                    "filter_params": params,
+                    "search_params": merged_params,  # 병합된 전체 파라미터 반환 (search_params로 통일)
                     "success": True
                 }
 
