@@ -18,7 +18,7 @@ from app.logging_config import (
     log_parse_result, log_parse_summary, log_timing
 )
 
-# NOTE: nearest_station 계산은 후처리 배치로 이동 (scripts/enrich_nearest_station.py)
+# NOTE: nearest_station은 백엔드에서 실시간 계산 (별도 저장 불필요)
 
 
 class CrawlerStats:
@@ -892,7 +892,7 @@ class JobKoreaScraper:
             # 주소에서 location 정보 추출
             location_info = normalize_location(company_address) if company_address else {}
 
-            # NOTE: nearest_station은 후처리 배치에서 계산 (크롤링 속도 최적화)
+            # NOTE: nearest_station은 백엔드에서 실시간 계산
 
             result = {
                 "job_type": normalized or primary_job_type,

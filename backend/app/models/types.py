@@ -34,7 +34,6 @@ class JobDict(TypedDict, total=False):
     # 위치 정보
     location_full: str
     location_gugun: str
-    nearest_station: str
 
     # 연봉 정보
     salary_text: str
