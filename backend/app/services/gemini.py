@@ -24,7 +24,12 @@ from app.models.types import (
     SearchParamsDict,
     PaginationDict
 )
-from app.services.job_search import search_jobs_with_commute, format_job_results, _matches_company_location
+from app.services.job_search import (
+    search_jobs_with_commute,
+    format_job_results,
+    _matches_company_location,
+    _calculate_commute_times
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +153,8 @@ class ConversationMemory:
         salary_min: Optional[int] = None,
         salary_max: Optional[int] = None,
         commute_max_minutes: Optional[int] = None,
-        company_location: Optional[str] = None
+        company_location: Optional[str] = None,
+        jobs: Optional[List[JobDict]] = None
     ) -> List[JobDict]:
         """캐시된 결과를 필터링하여 반환
 
@@ -157,7 +163,8 @@ class ConversationMemory:
         - company_location이 있으면: 해당 지역 회사만 포함
         """
         filtered = []
-        for job in self.last_search_results:
+        source_jobs = jobs if jobs is not None else self.last_search_results
+        for job in source_jobs:
             # 연봉 필터 - 명시된 연봉만 포함 (회사내규 제외)
             if salary_min is not None and salary_min > 0:
                 job_salary = job.get("salary_min")
@@ -311,7 +318,7 @@ class GeminiService:
                     job_keywords=params.get("job_keywords", []),
                     salary_min=params.get("salary_min", 0),
                     salary_max=params.get("salary_max"),
-                    commute_origin=commute_origin if commute_max else "",  # 통근 필터 없으면 origin도 불필요
+                    commute_origin=commute_origin,  # 항상 전달 → 통근시간 항상 계산
                     commute_max_minutes=commute_max,  # None이면 통근시간 계산/필터 건너뜀
                     company_location=company_location  # 회사 위치 필터
                 )
@@ -383,16 +390,51 @@ class GeminiService:
                         "success": True
                     }
 
+                commute_max = params.get("commute_max_minutes")
+                base_jobs = memory.last_search_results
+
+                # 통근시간 필터 요청인데 캐시에 통근정보가 없으면 재계산
+                if commute_max is not None:
+                    has_commute = any(
+                        job.get("commute_minutes") is not None for job in base_jobs
+                    )
+                    if not has_commute:
+                        user_loc = getattr(memory, "user_location", None)
+                        if not user_loc:
+                            response_text = (
+                                "통근시간 필터를 적용하려면 현재 위치 정보가 필요해요. "
+                                "위치 권한을 허용하거나 출발지를 알려주세요."
+                            )
+                            memory.add_model_message(response_text)
+                            return {
+                                "response": response_text,
+                                "jobs": [],
+                                "pagination": None,
+                                "success": True
+                            }
+
+                        if user_loc.get("address"):
+                            commute_origin = user_loc["address"]
+                        else:
+                            commute_origin = f"{user_loc['latitude']},{user_loc['longitude']}"
+
+                        base_jobs = await _calculate_commute_times(
+                            jobs=base_jobs,
+                            origin=commute_origin,
+                            max_minutes=commute_max
+                        )
+
                 # 필터링 수행
                 filtered_jobs = memory.filter_cached_results(
                     salary_min=params.get("salary_min"),
                     salary_max=params.get("salary_max"),
                     commute_max_minutes=params.get("commute_max_minutes"),
-                    company_location=params.get("company_location")
+                    company_location=params.get("company_location"),
+                    jobs=base_jobs
                 )
 
                 # 필터링 결과를 새로운 캐시로 저장
-                original_count = len(memory.last_search_results)
+                original_count = len(base_jobs)
                 memory.save_search(filtered_jobs, {**memory.last_search_params, **params})
 
                 # 첫 50건만 LLM에 전달

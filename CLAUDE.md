@@ -149,31 +149,42 @@ company_el = item.select_one(".company .name a")
 잡코리아 HTML 변경 시 `crawler/app/scrapers/jobkorea.py` 수정 필요.
 상세 유지보수 가이드: `.claude/skills/crawler-maintenance/SKILL.md`
 
-### 6. 크롤러 우선 업데이트 과제 (P0)
+### 6. 크롤러 스케줄 및 프록시 설정
 
-> **IP 차단 대응 - 프록시 로테이션 로직 강화**
+> **상세 계획:** `crawler/docs/CRAWLER_UPDATE_PLAN.md`
 
-**현재 상태:**
-- V2 크롤러에 적응형 폴백 구현됨 (직접 연결 → 프록시 전환)
-- 단일 프록시(IPRoyal) 사용 중
-- 과도한 요청 시 IP 차단 발생 확인됨
+**크롤링 모드:**
+| 모드 | 실행 시간 | 주기 | 프록시 | 용도 |
+|-----|---------|-----|-------|-----|
+| `full` | 일요일 03:00 | 주 1회 | 10워커 | 전체 동기화 |
+| `daily` | 매일 09:00 | 매일 | 10워커 | 신규/삭제 감지 |
+| `deadline` | 매일 21:00 | 매일 | 없음 | 마감일 체크 |
 
-**필요 작업:**
-1. **프록시 풀 관리**: 다중 프록시 로테이션
-2. **요청 속도 제어**: 적응형 rate limiting 고도화
-3. **차단 감지 개선**: 캡차/차단 페이지 패턴 인식
-4. **재시도 전략**: 지수 백오프 + 프록시 교체
+**실행 명령어:**
+```bash
+cd crawler && source venv/bin/activate
+python app/main.py --mode full      # 전체 크롤링
+python app/main.py --mode daily     # 일일 증분
+python app/main.py --mode deadline  # 마감일 체크
+```
+
+**IPRoyal 프록시:**
+- Host: `geo.iproyal.com:12321`
+- 동시 연결: **무제한**
+- 세션 형식: `_session-{8자}_lifetime-{시간}` (Sticky)
+- 문서: `crawler/docs/IPROYAL_PROXY.md`
 
 **관련 파일:**
 - `crawler/app/core/session_manager.py` - 프록시 세션 관리
 - `crawler/app/core/ajax_client.py` - 적응형 rate limiter
-- `crawler/app/scrapers/jobkorea_v2.py` - 폴백 로직
+- `crawler/app/scrapers/jobkorea_v2.py` - V2 스크래퍼
 
-**테스트 완료 항목:**
+**완료 항목:**
 - [x] V2 크롤러 기본 동작 검증
 - [x] 10,000건+ 크롤링 성공
-- [ ] 장시간 연속 크롤링 안정성
-- [ ] 프록시 로테이션 구현
+- [x] 프록시 10워커 구조 설계
+- [ ] Daily Sync 모드 구현
+- [ ] 제목 토큰 추출 구현
 
 ---
 
