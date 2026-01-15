@@ -369,14 +369,32 @@ class JobKoreaScraperV2:
         """상세 페이지 파싱"""
         soup = BeautifulSoup(html, "lxml")
 
-        # 제목
+        # 제목 - 여러 소스에서 추출 시도
         title = ""
-        title_el = soup.select_one("h1.title, .tit_job, .job-title")
-        if title_el:
-            title = title_el.get_text(strip=True)
+        # 1. JSON-LD의 title 필드 (가장 정확함)
+        json_ld_title = re.search(r'"@type"\s*:\s*"JobPosting"[^}]*"title"\s*:\s*"([^"]+)"', html, re.DOTALL)
+        if not json_ld_title:
+            json_ld_title = re.search(r'"title"\s*:\s*"([^"]{10,})"', html)  # 10자 이상
+        if json_ld_title:
+            title = json_ld_title.group(1)
+        # 2. CSS 셀렉터
+        if not title:
+            title_el = soup.select_one("h1.title, .tit_job, .job-title, .recruit-title")
+            if title_el:
+                title = title_el.get_text(strip=True)
+        # 3. og:title 메타태그
+        if not title:
+            og_title = soup.select_one('meta[property="og:title"]')
+            if og_title:
+                title = og_title.get("content", "")
+        # 4. <title> 태그 (최후 수단, "회사명 채용" 패턴 필터링)
         if not title:
             title_match = re.search(r'<title>([^<]+)</title>', html)
-            title = title_match.group(1).split(" - ")[0] if title_match else ""
+            if title_match:
+                raw_title = title_match.group(1).split(" - ")[0].split(" | ")[0].strip()
+                # "XXX 채용" 패턴이면 스킵 (잘못된 title)
+                if not re.match(r'^.{2,20}\s*채용$', raw_title):
+                    title = raw_title
 
         # 회사명 - JSON-LD에서 먼저 추출 시도
         company_name = ""
@@ -443,6 +461,9 @@ class JobKoreaScraperV2:
         # 회사명 정규화
         company_name_normalized, company_type = self.company_normalizer.normalize(company_name)
 
+        # 마감일 추출
+        deadline_info = self._extract_deadline_info(html)
+
         now = datetime.now()
 
         return {
@@ -472,7 +493,77 @@ class JobKoreaScraperV2:
             "created_at": now,
             "updated_at": now,
             "dedup_key": "",  # 나중에 계산
+            **deadline_info,  # deadline, deadline_type, deadline_date
         }
+
+    def _extract_deadline_info(self, html: str) -> Dict:
+        """마감일 정보 추출"""
+        from datetime import datetime as dt
+
+        result = {
+            "deadline": "",
+            "deadline_type": "unknown",
+            "deadline_date": None,
+        }
+
+        # 1. 날짜 패턴 먼저 시도 (우선순위 높음)
+        date_patterns = [
+            # Meta description: 마감일 : 2025.04.11
+            (r'마감일\s*:\s*(\d{4}\.\d{2}\.\d{2})', "date_dot"),
+            # JSON-LD validThrough (한국식)
+            (r'"validThrough"\s*:\s*"?(\d{4}\.\d{2}\.\d{2})"?', "date_dot"),
+            # JSON-LD validThrough (ISO)
+            (r'"validThrough"\s*:\s*"([^"]+)"', "date_iso"),
+            # applicationEndAt
+            (r'"applicationEndAt"\s*:\s*"([^"]+)"', "date_iso"),
+        ]
+
+        for pattern, dtype in date_patterns:
+            match = re.search(pattern, html)
+            if match:
+                date_str = match.group(1).strip()
+                try:
+                    if dtype == "date_dot":
+                        # 2025.04.11 형식
+                        parsed = dt.strptime(date_str, "%Y.%m.%d")
+                        result["deadline"] = parsed.strftime("%m.%d")
+                        result["deadline_date"] = parsed
+                        result["deadline_type"] = "date"
+                        return result
+                    elif dtype == "date_iso":
+                        if "T" in date_str:
+                            parsed = dt.fromisoformat(date_str.replace("Z", "+00:00").split("+")[0])
+                        elif "-" in date_str:
+                            parsed = dt.strptime(date_str[:10], "%Y-%m-%d")
+                        else:
+                            continue
+                        result["deadline"] = parsed.strftime("%m.%d")
+                        result["deadline_date"] = parsed
+                        result["deadline_type"] = "date"
+                        return result
+                except:
+                    pass
+
+        # 2. 상시채용/채용시마감 패턴
+        ongoing_patterns = [
+            (r'상시\s*채용|상시채용', "ongoing"),
+            (r'채용\s*시\s*마감|채용시까지', "until_hired"),
+        ]
+
+        for pattern, dtype in ongoing_patterns:
+            if re.search(pattern, html, re.IGNORECASE):
+                if dtype == "ongoing":
+                    result["deadline"] = "상시채용"
+                    result["deadline_type"] = "ongoing"
+                else:
+                    result["deadline"] = "채용시 마감"
+                    result["deadline_type"] = "until_hired"
+                return result
+
+        # 3. 아무것도 없으면 unknown
+        result["deadline"] = ""
+        result["deadline_type"] = "unknown"
+        return result
 
     # ========== 전체 크롤링 ==========
 
