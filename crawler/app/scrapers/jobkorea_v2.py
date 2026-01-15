@@ -408,12 +408,15 @@ class JobKoreaScraperV2:
             if company_el:
                 company_name = company_el.get_text(strip=True)
 
-        # workFields 추출
-        work_fields_match = re.search(r'workFields\\\\?":\[([^\]]*)\]', html)
+        # workFields 추출 (이스케이프된 JSON 처리)
+        work_fields_match = re.search(r'workFields\\?":\s*\[([^\]]*)\]', html)
         work_fields = []
         if work_fields_match:
             content = work_fields_match.group(1)
-            work_fields = re.findall(r'"([^"]+)"', content)
+            # 이스케이프된 따옴표 패턴: \"값\" 또는 "값"
+            raw_fields = re.findall(r'\\?"([^"\\]+)\\?"', content)
+            # 백슬래시 정리
+            work_fields = [f.rstrip('\\').strip() for f in raw_fields if f.strip()]
 
         # 급여 정보
         salary_text = ""
@@ -450,6 +453,33 @@ class JobKoreaScraperV2:
         )
         if size_match:
             company_size = size_match.group(1)
+
+        # 고용형태 추출
+        employment_type = ""
+        # 1. JSON에서 employmentType 또는 jobTypeName 추출
+        emp_match = re.search(r'"employmentType"\s*:\s*"([^"]+)"', html)
+        if emp_match:
+            emp_code = emp_match.group(1).upper()
+            emp_map = {
+                "PERMANENT": "정규직",
+                "CONTRACT": "계약직",
+                "INTERN": "인턴",
+                "PARTTIME": "파트타임",
+                "DISPATCH": "파견직",
+                "FREELANCE": "프리랜서",
+            }
+            employment_type = emp_map.get(emp_code, "")
+        # 2. jobTypeName 폴백
+        if not employment_type:
+            job_type_match = re.search(r'"jobTypeName"\s*:\s*"([^"]+)"', html)
+            if job_type_match:
+                employment_type = job_type_match.group(1)
+        # 3. HTML 텍스트에서 직접 추출
+        if not employment_type:
+            for emp in ["정규직", "계약직", "인턴", "파트타임", "파견직", "프리랜서"]:
+                if emp in html:
+                    employment_type = emp
+                    break
 
         # 정규화
         primary_job_type = work_fields[0] if work_fields else ""
@@ -489,6 +519,7 @@ class JobKoreaScraperV2:
             "salary_max": salary_data["max"],
             "salary_type": salary_data["type"],
             "company_size": company_size,
+            "employment_type": employment_type,
             "is_active": True,
             "created_at": now,
             "updated_at": now,
