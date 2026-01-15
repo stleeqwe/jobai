@@ -1,5 +1,7 @@
 # IPRoyal 프록시 설정 가이드
 
+> **참조 문서** - 메인 크롤러 문서: `CRAWLER.md`
+>
 > 작성일: 2026-01-16
 > 참조: https://docs.iproyal.com/proxies/residential/proxy/rotation
 

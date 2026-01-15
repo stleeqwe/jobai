@@ -134,57 +134,42 @@ from google.generativeai import ...
 2. 서버 재시작
 3. `curl http://localhost:8000/model-info`로 확인
 
-### 5. 크롤러 셀렉터 (HTML 구조 변경 시)
+### 5. 크롤러 V2
 
-**현재 유효한 셀렉터 (2026-01):**
-```python
-# 목록 - 반드시 "li.devloopArea" 사용 (.devloopArea는 div 포함됨)
-job_items = soup.select("li.devloopArea")
+> **상세 문서**: `crawler/docs/CRAWLER.md`
 
-# 제목, 회사명
-title_el = item.select_one(".description a .text")
-company_el = item.select_one(".company .name a")
-```
+**현재 상태 (2026-01-16 검증 완료):**
 
-잡코리아 HTML 변경 시 `crawler/app/scrapers/jobkorea.py` 수정 필요.
-상세 유지보수 가이드: `.claude/skills/crawler-maintenance/SKILL.md`
-
-### 6. 크롤러 스케줄 및 프록시 설정
-
-> **상세 계획:** `crawler/docs/CRAWLER_UPDATE_PLAN.md`
-
-**크롤링 모드:**
-| 모드 | 실행 시간 | 주기 | 프록시 | 용도 |
-|-----|---------|-----|-------|-----|
-| `full` | 일요일 03:00 | 주 1회 | 10워커 | 전체 동기화 |
-| `daily` | 매일 09:00 | 매일 | 10워커 | 신규/삭제 감지 |
-| `deadline` | 매일 21:00 | 매일 | 없음 | 마감일 체크 |
+| 항목 | 값 |
+|------|-----|
+| 버전 | V2 Lite (httpx + AJAX) |
+| 서울 전체 공고 | ~64,000건 |
+| 실측 수집량 | 10,000건/회 |
+| 수집 속도 | 4.4건/s (10워커) |
+| 데이터 품질 | 90.1% |
 
 **실행 명령어:**
 ```bash
 cd crawler && source venv/bin/activate
-python app/main.py --mode full      # 전체 크롤링
-python app/main.py --mode daily     # 일일 증분
-python app/main.py --mode deadline  # 마감일 체크
+python run_crawl_500.py       # 500페이지 크롤링 (10,000건)
+python test_e2e_quality.py    # 데이터 품질 검증
 ```
 
-**IPRoyal 프록시:**
-- Host: `geo.iproyal.com:12321`
-- 동시 연결: **무제한**
-- 세션 형식: `_session-{8자}_lifetime-{시간}` (Sticky)
-- 문서: `crawler/docs/IPROYAL_PROXY.md`
-
-**관련 파일:**
-- `crawler/app/core/session_manager.py` - 프록시 세션 관리
-- `crawler/app/core/ajax_client.py` - 적응형 rate limiter
-- `crawler/app/scrapers/jobkorea_v2.py` - V2 스크래퍼
+**핵심 파일:**
+- `crawler/app/scrapers/jobkorea_v2.py` - V2 메인 스크래퍼
+- `crawler/app/core/session_manager.py` - 세션/프록시 관리
+- `crawler/app/core/ajax_client.py` - AJAX 클라이언트
 
 **완료 항목:**
-- [x] V2 크롤러 기본 동작 검증
-- [x] 10,000건+ 크롤링 성공
-- [x] 프록시 10워커 구조 설계
-- [ ] Daily Sync 모드 구현
-- [ ] 제목 토큰 추출 구현
+- [x] V2 크롤러 운영 검증 (10,000건 성공)
+- [x] 프록시 폴백 로직 구현
+- [x] 제목 토큰 추출 → job_keywords 반영
+- [x] 데이터 품질 90%+ 달성
+
+**미구현 (배포 시 구현 예정):**
+- [ ] Daily Sync 모드 (일일 증분 업데이트)
+- [ ] 스케줄러 설정 (systemd timer / cron)
+- 상세: `crawler/docs/CRAWLER.md` 섹션 7 참조
 
 ---
 
