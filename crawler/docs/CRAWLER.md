@@ -53,12 +53,13 @@ AJAX 엔드포인트: /Recruit/Home/_GI_List
 │     GET /recruit/joblist → 세션 쿠키 획득                    │
 │     (ASP.NET_SessionId, jobkorea, CookieNo 등)              │
 │                                                              │
-│  2. 목록 수집 (구별 분할 병렬)                                │
+│  2. 목록 수집 (구별 순차, 5워커, 프록시 OFF)                  │
 │     GET /Recruit/Home/_GI_List?Page=N&local=I0XX            │
 │     → 25개 구별로 분할하여 API 제한 우회                      │
+│     → 강남구: 고용형태+경력 조합으로 추가 분할                │
 │     → 구별 합계 ~69,000건 → 중복 제거 후 ~51,000건           │
 │                                                              │
-│  3. 상세 수집 (30워커 병렬)                                   │
+│  3. 상세 수집 (30워커 병렬, 프록시 풀 30개)                   │
 │     GET /Recruit/GI_Read/{job_id}                           │
 │     → JSON-LD + HTML 파싱                                    │
 │     → 제목 토큰 추출 → job_keywords 병합                     │
@@ -154,12 +155,15 @@ python test_e2e_quality.py
 
 ### 주요 설정 (run_crawler.py)
 
+| 단계 | 워커 수 | 프록시 | 비고 |
+|------|---------|--------|------|
+| 목록 수집 | 5 | OFF (fallback만) | 구별 순차 처리 |
+| 상세 수집 | 30 | ON (풀 30개) | 병렬 처리 |
+
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
-| `num_workers` | 30 | 병렬 워커 수 |
-| `use_proxy` | True | 프록시 사용 (필수) |
-| `proxy_pool_size` | 30 | 프록시 풀 크기 |
 | `save_batch_size` | 500 | DB 저장 배치 크기 |
+| `--skip-existing` | False | 기존 공고 스킵 (증분 모드) |
 
 ---
 
@@ -442,13 +446,13 @@ User=crawler
 | 성동구 | I100 | 768 | ✓ |
 
 **24개 구**: 10,000건 이하로 전체 수집 가능
-**강남구**: 16,039건으로 직무 카테고리 추가 분할 필요
+**강남구**: 16,039건으로 고용형태(jobtype)+경력(career) 조합으로 분할
 
 #### 실행 방법
 
 ```bash
 cd crawler && source venv/bin/activate
-python run_crawl_by_gu.py
+python run_crawler.py
 ```
 
 #### 검증 결과 (2026-01-16)
