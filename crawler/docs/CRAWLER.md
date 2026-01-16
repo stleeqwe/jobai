@@ -1,7 +1,7 @@
 # 잡코리아 크롤러 V2
 
 > **최종 업데이트**: 2026-01-16
-> **버전**: 2.1 (Production)
+> **버전**: 2.2 (Refactored)
 
 ---
 
@@ -73,13 +73,18 @@ AJAX 엔드포인트: /Recruit/Home/_GI_List
 
 ```
 crawler/app/
+├── config.py                # 크롤러 상수 중앙화
+├── exceptions.py            # 커스텀 예외 (BlockedError, ParseError 등)
 ├── scrapers/
-│   ├── jobkorea.py          # V1 (레거시, 유지)
-│   └── jobkorea_v2.py       # V2 Lite (메인)
+│   └── jobkorea_v2.py       # V2 메인 크롤러 (오케스트레이션)
+├── parsers/
+│   └── detail_parser.py     # 상세 페이지 파서 (JSON-LD/CSS/정규식)
+├── workers/
+│   └── detail_worker.py     # 상세 크롤링 오케스트레이터
 ├── core/
 │   ├── session_manager.py   # 세션/프록시 관리
 │   └── ajax_client.py       # AJAX 클라이언트 + Rate Limiter
-├── normalizers/             # 데이터 정규화
+├── normalizers/             # 데이터 정규화 모듈
 └── db/
     └── firestore.py         # DB 저장
 ```
@@ -226,22 +231,29 @@ username:password_session-{8자}_lifetime-{시간}@geo.iproyal.com:12321
 ### 구현 내용
 
 ```python
-# jobkorea_v2.py - _parse_detail_page()
+# app/parsers/detail_parser.py - DetailPageParser._build_keywords()
 
-stopwords = {
-    "채용", "모집", "신입", "경력", "정규직", "계약직",
-    "급구", "우대", "담당", "업무", "직원", "구인", ...
+# 모듈 레벨에서 정규식 컴파일 (성능 최적화)
+_PATTERNS = {
+    "whitespace": re.compile(r'\s+'),
+    "non_alphanumeric": re.compile(r'[^0-9a-zA-Z가-힣+#]'),
 }
 
-# 제목에서 토큰 추출
-title_tokens = []
-for raw_token in re.split(r"\s+", title):
-    token = re.sub(r"[^0-9a-zA-Z가-힣+#]", "", raw_token)
-    if len(token) >= 2 and token.lower() not in stopwords:
-        title_tokens.append(token)
+_STOPWORDS = frozenset({
+    "채용", "모집", "신입", "경력", "정규직", "계약직",
+    "급구", "우대", "담당", "업무", "직원", "구인", ...
+})
 
-# work_fields + title_tokens 병합 (중복 제거)
-job_keywords = list(dict.fromkeys(work_fields + title_tokens))[:7]
+def _build_keywords(self, work_fields: List[str], title: str) -> List[str]:
+    # 제목에서 토큰 추출
+    title_tokens = []
+    for raw_token in _PATTERNS["whitespace"].split(title):
+        token = _PATTERNS["non_alphanumeric"].sub("", raw_token)
+        if len(token) >= 2 and token.lower() not in _STOPWORDS:
+            title_tokens.append(token)
+
+    # work_fields + title_tokens 병합 (중복 제거)
+    return list(dict.fromkeys(work_fields + title_tokens))[:7]
 ```
 
 ### 예시
@@ -485,6 +497,7 @@ python run_crawl_by_gu.py
 
 | 날짜 | 버전 | 내용 |
 |------|------|------|
+| 2026-01-16 | 2.2 | **대규모 리팩토링**: 파서 분리 (`DetailPageParser`), 워커 분리 (`DetailCrawlOrchestrator`), 상수 중앙화 (`CrawlerConfig`), 예외 표준화 (`exceptions.py`), 테스트 구조화 |
 | 2026-01-16 | 2.1 | **서울 전체 51,000건 수집 완료** (구별 분할 + 중복 제거) |
 | 2026-01-16 | 2.1 | 워커 수 확대 (10 → 30), 프록시 풀 30개 |
 | 2026-01-16 | 2.1 | 상세 수집 워커-큐 패턴 리팩토링 (이슈 #013) |

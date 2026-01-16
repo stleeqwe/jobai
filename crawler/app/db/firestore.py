@@ -234,6 +234,38 @@ async def get_active_job_count() -> int:
     return result[0][0].value if result else 0
 
 
+async def get_existing_job_ids(prefix: str = "jk_") -> set[str]:
+    """
+    기존 활성 공고 ID 조회 (크롤링 스킵용)
+
+    Args:
+        prefix: job_id 접두사 (기본 "jk_" = 잡코리아)
+
+    Returns:
+        기존 공고 ID 세트 (jk_ 접두사 제외한 순수 ID)
+
+    Example:
+        existing = await get_existing_job_ids()
+        # {"12345678", "87654321", ...}
+        new_ids = crawled_ids - existing  # 새 공고만 필터링
+    """
+    db = get_db()
+
+    # 활성 공고만 조회 (ID만 가져옴 - 비용 절감)
+    query = db.collection("jobs").where("is_active", "==", True).select([])
+
+    existing_ids = set()
+    for doc in query.stream():
+        doc_id = doc.id
+        # jk_ 접두사 제거하여 순수 job_id만 저장
+        if doc_id.startswith(prefix):
+            existing_ids.add(doc_id[len(prefix):])
+        else:
+            existing_ids.add(doc_id)
+
+    return existing_ids
+
+
 async def get_job_stats() -> dict:
     """
     채용공고 통계 조회
@@ -397,7 +429,7 @@ async def get_jobs_for_verification(
                         last_verified = datetime.fromisoformat(
                             last_verified.replace("Z", "+00:00")
                         )
-                    except:
+                    except (ValueError, TypeError):
                         last_verified = None
 
                 if last_verified and last_verified < cutoff_date:

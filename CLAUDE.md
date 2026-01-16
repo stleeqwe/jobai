@@ -307,7 +307,10 @@ python test_e2e_quality.py            # 데이터 품질 검증
 
 **핵심 파일:**
 - `crawler/run_crawler.py` - 메인 크롤러 (구별 분할 + 프록시 풀)
-- `crawler/app/scrapers/jobkorea_v2.py` - V2 스크래퍼
+- `crawler/app/scrapers/jobkorea_v2.py` - V2 스크래퍼 (오케스트레이션)
+- `crawler/app/parsers/detail_parser.py` - 상세 페이지 파서 (JSON-LD/CSS/정규식)
+- `crawler/app/workers/detail_worker.py` - 상세 크롤링 오케스트레이터
+- `crawler/app/config.py` - 크롤러 상수 중앙화
 - `crawler/app/core/session_manager.py` - 세션/프록시 관리
 - `crawler/app/core/ajax_client.py` - AJAX 클라이언트
 - `crawler/app/db/firestore.py` - DB 저장 (skip 로직 포함)
@@ -358,9 +361,13 @@ python test_e2e_quality.py            # 데이터 품질 검증
 Claude는 다음을 **읽고 분석**할 수 있음 (수정은 Codex):
 
 - `crawler/app/scrapers/` - 스크래핑 로직
+- `crawler/app/parsers/` - 상세 페이지 파싱 (JSON-LD/CSS/정규식)
+- `crawler/app/workers/` - 크롤링 오케스트레이터
 - `crawler/app/normalizers/` - 데이터 정규화
 - `crawler/app/db/` - DB 저장 로직
 - `crawler/app/core/` - 세션/프록시/Rate Limiter
+- `crawler/app/config.py` - 크롤러 상수
+- `crawler/app/exceptions.py` - 커스텀 예외
 - `crawler/.codex/issues/` - 기존 이슈 히스토리
 
 #### Codex 협업 요청 형식
@@ -412,8 +419,11 @@ crawler/.codex/issues/
 
 | 파일 | 역할 | 수정 시 주의 |
 |------|------|-------------|
-| `app/scrapers/jobkorea_v2.py` | V2 메인 크롤러 | 이슈 필수, 테스트 필수 |
-| `app/scrapers/jobkorea_v2.py:_parse_detail_page()` | HTML/JSON-LD 파싱 | 셀렉터 변경 주의 |
+| `app/scrapers/jobkorea_v2.py` | V2 메인 크롤러 (오케스트레이션) | 이슈 필수, 테스트 필수 |
+| `app/parsers/detail_parser.py` | 상세 페이지 파싱 (JSON-LD/CSS/정규식) | 셀렉터/패턴 변경 주의 |
+| `app/workers/detail_worker.py` | 상세 크롤링 오케스트레이터 | 병렬 로직 주의 |
+| `app/config.py` | 크롤러 상수 (URL, 타임아웃) | 관련 파일 영향 확인 |
+| `app/exceptions.py` | 커스텀 예외 | 에러 핸들링 영향 확인 |
 | `app/core/session_manager.py` | 세션/프록시 관리 | 인증 로직 주의 |
 | `app/core/ajax_client.py` | AJAX + Rate Limiter | API 변경 시 이슈 |
 | `app/normalizers/*.py` | 데이터 정규화 | 매핑 추가 시 이슈 |

@@ -4,6 +4,7 @@ import re
 from typing import List, Optional, Set
 import httpx
 
+from app.config import CrawlerConfig
 from app.logging_config import get_logger
 
 logger = get_logger("crawler.ajax")
@@ -12,16 +13,13 @@ logger = get_logger("crawler.ajax")
 class AjaxClient:
     """AJAX 엔드포인트 클라이언트"""
 
-    BASE_URL = "https://www.jobkorea.co.kr"
-    AJAX_ENDPOINT = "/Recruit/Home/_GI_List"
-
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
 
     async def fetch_page(
         self,
         page_num: int,
-        local: str = "I000"
+        local: str = CrawlerConfig.SEOUL_LOCAL_CODE
     ) -> List[str]:
         """
         목록 페이지 AJAX 호출
@@ -35,7 +33,7 @@ class AjaxClient:
         """
         try:
             resp = await self.client.get(
-                f"{self.BASE_URL}{self.AJAX_ENDPOINT}",
+                CrawlerConfig.get_ajax_url(),
                 params={"Page": page_num, "local": local},
                 headers={"X-Requested-With": "XMLHttpRequest"}
             )
@@ -55,11 +53,11 @@ class AjaxClient:
             logger.error(f"AJAX 호출 예외: 페이지 {page_num}, {e}")
             return []
 
-    async def get_total_count(self, local: str = "I000") -> int:
+    async def get_total_count(self, local: str = CrawlerConfig.SEOUL_LOCAL_CODE) -> int:
         """전체 공고 수 조회"""
         try:
             resp = await self.client.get(
-                f"{self.BASE_URL}{self.AJAX_ENDPOINT}",
+                CrawlerConfig.get_ajax_url(),
                 params={"Page": 1, "local": local},
                 headers={"X-Requested-With": "XMLHttpRequest"}
             )
@@ -82,7 +80,7 @@ class AjaxClient:
         self,
         start_page: int,
         end_page: int,
-        local: str = "I000"
+        local: str = CrawlerConfig.SEOUL_LOCAL_CODE
     ) -> Set[str]:
         """
         여러 페이지 순차 호출
@@ -104,18 +102,18 @@ class AjaxClient:
         return all_ids
 
 
-class BlockedError(Exception):
-    """차단 감지 예외"""
-    pass
+# BlockedError는 app.exceptions에서 import
+# 하위 호환성을 위해 여기서도 re-export
+from app.exceptions import BlockedError
 
 
 class AdaptiveRateLimiter:
     """적응형 속도 제한"""
 
-    def __init__(self, initial_delay: float = 0.05):
-        self.delay = initial_delay  # 초기 50ms
-        self.min_delay = 0.05  # 최소 50ms
-        self.max_delay = 5.0  # 최대 5초
+    def __init__(self, initial_delay: float = CrawlerConfig.INITIAL_DELAY):
+        self.delay = initial_delay
+        self.min_delay = CrawlerConfig.MIN_DELAY
+        self.max_delay = CrawlerConfig.MAX_DELAY
         self.consecutive_errors = 0
         self.blocked = False
 

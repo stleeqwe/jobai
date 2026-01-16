@@ -4,7 +4,7 @@ import random
 from typing import Optional
 import httpx
 
-from app.config import USER_AGENTS, settings
+from app.config import CrawlerConfig, USER_AGENTS, settings
 from app.logging_config import get_logger
 
 logger = get_logger("crawler.session")
@@ -12,9 +12,6 @@ logger = get_logger("crawler.session")
 
 class SessionManager:
     """httpx 기반 세션 관리"""
-
-    BASE_URL = "https://www.jobkorea.co.kr"
-    JOBLIST_URL = f"{BASE_URL}/recruit/joblist"
 
     # 프록시 설정 (IPRoyal)
     PROXY_HOST = settings.PROXY_HOST
@@ -71,11 +68,10 @@ class SessionManager:
         proxy_url = self._get_proxy_url()
 
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=CrawlerConfig.DEFAULT_TIMEOUT,
             headers={
                 "User-Agent": random.choice(USER_AGENTS),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "ko-KR,ko;q=0.9",
+                **CrawlerConfig.DEFAULT_HEADERS,
             },
             follow_redirects=True,
             proxy=proxy_url,
@@ -83,8 +79,8 @@ class SessionManager:
 
         # 세션 쿠키 획득
         resp = await self.client.get(
-            self.JOBLIST_URL,
-            params={"menucode": "local", "local": "I000"}
+            CrawlerConfig.get_joblist_url(),
+            params={"menucode": "local", "local": CrawlerConfig.SEOUL_LOCAL_CODE}
         )
 
         self.cookies = self.client.cookies
@@ -127,11 +123,10 @@ class SessionManager:
         proxy_url = self._get_proxy_url(worker_id=worker_id, lifetime=lifetime)
 
         return httpx.AsyncClient(
-            timeout=30.0,
+            timeout=CrawlerConfig.DEFAULT_TIMEOUT,
             headers={
                 "User-Agent": USER_AGENTS[worker_id % len(USER_AGENTS)],
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "ko-KR,ko;q=0.9",
+                **CrawlerConfig.DEFAULT_HEADERS,
             },
             follow_redirects=True,
             proxy=proxy_url,
@@ -150,11 +145,10 @@ class ProxySessionManager(SessionManager):
         proxy_url = self._get_proxy_url()
 
         self.client = httpx.AsyncClient(
-            timeout=30.0,
+            timeout=CrawlerConfig.DEFAULT_TIMEOUT,
             headers={
                 "User-Agent": random.choice(USER_AGENTS),
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "ko-KR,ko;q=0.9",
+                **CrawlerConfig.DEFAULT_HEADERS,
             },
             follow_redirects=True,
             proxy=proxy_url,

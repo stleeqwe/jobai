@@ -83,21 +83,23 @@ return {
 ## 크롤링 흐름
 
 ```
-1. 목록 페이지 수집
-   └─ 공고 기본 정보 (제목, 회사명, 태그)
+1. 목록 페이지 수집 (AjaxClient)
+   └─ AJAX 엔드포인트로 Job ID 수집
 
-2. 상세 페이지 수집 (_fetch_detail_info)
-   ├─ JSON-LD 파싱 (addressLocality)
-   ├─ 회사 주소 추출
-   ├─ 연봉 정보 파싱
-   └─ 상세 설명 추출
+2. 상세 페이지 수집 (DetailCrawlOrchestrator)
+   ├─ 병렬 워커로 상세 페이지 fetch
+   └─ DetailPageParser로 파싱
+       ├─ JSON-LD 파싱 (title, company, address)
+       ├─ CSS 셀렉터 폴백
+       └─ 정규식 패턴 매칭 (캐싱됨)
 
-3. 정규화
+3. 정규화 (normalizers/)
    ├─ location.py - 주소 정규화
    ├─ salary.py - 연봉 정규화
-   └─ job_type.py - 고용형태 정규화
+   ├─ job_type.py - 직무 카테고리
+   └─ company.py - 회사명 정규화
 
-4. Firestore 저장
+4. Firestore 저장 (배치 500건 단위)
 ```
 
 ---
@@ -115,9 +117,12 @@ return {
 
 ### 새 필드 추가 시
 
-1. `_fetch_detail_info()` 반환값에 필드 추가
-2. Firestore 저장 로직 확인
-3. 백엔드 Gemini 서비스에서 해당 필드 사용 가능한지 확인
+1. `app/parsers/detail_parser.py`에서:
+   - `_parse_XXX()` 메서드 추가
+   - `parse()` 반환 딕셔너리에 필드 포함
+2. 정규화 필요 시 `app/normalizers/`에 로직 추가
+3. Firestore 저장 로직 확인
+4. 백엔드 Gemini 서비스에서 해당 필드 사용 가능한지 확인
 
 ### 데이터 품질 점검
 
@@ -135,11 +140,15 @@ db.collection("jobs").where("location_full", "==", "").stream()
 
 | 파일 | 역할 |
 |------|------|
-| `app/scrapers/jobkorea.py` | 잡코리아 크롤러 메인 |
-| `app/normalizers/location.py` | 주소 정규화 |
-| `app/normalizers/salary.py` | 연봉 정규화 |
-| `app/db/firestore.py` | Firestore 연결 |
-| `scripts/update_location_full.py` | 위치 데이터 마이그레이션 |
+| `app/scrapers/jobkorea_v2.py` | V2 크롤러 메인 |
+| `app/parsers/detail_parser.py` | 상세 페이지 파서 (JSON-LD/CSS/정규식) |
+| `app/workers/detail_worker.py` | 상세 크롤링 오케스트레이터 |
+| `app/core/ajax_client.py` | AJAX 클라이언트 + Rate Limiter |
+| `app/core/session_manager.py` | 세션/프록시 관리 |
+| `app/config.py` | 크롤러 상수 (URL, 타임아웃 등) |
+| `app/exceptions.py` | 커스텀 예외 (BlockedError 등) |
+| `app/normalizers/*.py` | 데이터 정규화 모듈 |
+| `app/db/firestore.py` | Firestore 연결/저장 |
 
 ---
 
