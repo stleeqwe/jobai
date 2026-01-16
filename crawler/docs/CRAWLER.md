@@ -1,7 +1,7 @@
 # 잡코리아 크롤러 V2
 
 > **최종 업데이트**: 2026-01-16
-> **버전**: 2.0 (Production)
+> **버전**: 2.1 (Production)
 
 ---
 
@@ -12,11 +12,11 @@
 | 항목 | 값 |
 |------|-----|
 | **버전** | V2 Lite (httpx + AJAX) |
-| **서울 전체 공고** | ~64,000건 |
+| **서울 전체 공고** | ~51,000건 (구별 중복 제거 후) |
 | **API 제한** | **250페이지 (10,000건)** |
-| **실측 수집량** | 10,000건/회 |
-| **수집 속도** | 4.4건/s (10워커) |
-| **프록시** | IPRoyal (폴백 방식) |
+| **실측 수집량** | 51,000건 전체 (구별 분할 크롤링) |
+| **수집 속도** | 12-18건/s (30워커, 프록시 풀 30개) |
+| **프록시** | IPRoyal Residential (30개 세션 병렬) |
 
 ### 핵심 기술
 
@@ -53,12 +53,12 @@ AJAX 엔드포인트: /Recruit/Home/_GI_List
 │     GET /recruit/joblist → 세션 쿠키 획득                    │
 │     (ASP.NET_SessionId, jobkorea, CookieNo 등)              │
 │                                                              │
-│  2. 목록 수집 (10워커 병렬)                                   │
-│     GET /Recruit/Home/_GI_List?Page=N&local=I000            │
-│     → 페이지당 40개 Job ID 추출                              │
-│     → 최대 250페이지 = 10,000건 (API 제한)                   │
+│  2. 목록 수집 (구별 분할 병렬)                                │
+│     GET /Recruit/Home/_GI_List?Page=N&local=I0XX            │
+│     → 25개 구별로 분할하여 API 제한 우회                      │
+│     → 구별 합계 ~69,000건 → 중복 제거 후 ~51,000건           │
 │                                                              │
-│  3. 상세 수집 (10워커 병렬)                                   │
+│  3. 상세 수집 (30워커 병렬)                                   │
 │     GET /Recruit/GI_Read/{job_id}                           │
 │     → JSON-LD + HTML 파싱                                    │
 │     → 제목 토큰 추출 → job_keywords 병합                     │
@@ -88,27 +88,73 @@ crawler/app/
 
 ## 3. 실행 방법
 
-### 현재 사용 가능한 스크립트
+### ⚠️ 실행 전 필수 확인사항
+
+**절대 임의로 진행하지 말 것! 반드시 사용자에게 확인 후 진행.**
+
+#### 1. 프록시 설정 확인 (필수)
+
+```bash
+cat .env | grep PROXY_
+```
+
+**필수 환경변수:**
+```
+PROXY_HOST=geo.iproyal.com
+PROXY_PORT=12321
+PROXY_USERNAME=<사용자명>
+PROXY_PASSWORD=<비밀번호>
+```
+
+- 4개 모두 설정되어야 함
+- 누락 시 → **즉시 중단, 사용자에게 설정 요청**
+- ❌ 프록시 없이 임의로 진행 금지!
+
+#### 2. 설정 누락/오류 시 대응
+
+- ❌ 임의로 대체 모드로 진행
+- ✅ 즉시 중단하고 사용자에게 보고 및 확인 요청
+
+#### 3. 크롤링 중 모니터링 필수
+
+| 항목 | 정상 범위 | 이상 시 조치 |
+|------|----------|-------------|
+| 속도 | 12-18건/s | 프록시/워커 수 확인 |
+| 403/429 | 0회 | 즉시 중단, 보고 |
+| 404 비율 | 10% 이하 | 정상 (삭제된 공고) |
+
+#### 4. 이상 발견 시
+
+1. 즉시 사용자에게 보고
+2. 조치 방안 제시
+3. 사용자 승인 후 진행
+
+### 실행 스크립트
 
 ```bash
 cd crawler && source venv/bin/activate
 
-# 500페이지 크롤링 (10,000건)
-python run_crawl_500.py
+# 전체 크롤링 (64,000건)
+python run_crawler.py
+
+# 증분 크롤링 (신규만)
+python run_crawler.py --skip-existing
+
+# 목록만 수집
+python run_crawler.py --list-only
 
 # 데이터 품질 검증
 python test_e2e_quality.py
 ```
 
-### 주요 설정
+### 주요 설정 (run_crawler.py)
 
 | 설정 | 기본값 | 설명 |
 |------|--------|------|
-| `num_workers` | 10 | 병렬 워커 수 |
-| `use_proxy` | False | 프록시 사용 여부 |
-| `fallback_to_proxy` | True | 차단 시 프록시 전환 |
+| `num_workers` | 30 | 병렬 워커 수 |
+| `use_proxy` | True | 프록시 사용 (필수) |
+| `proxy_pool_size` | 30 | 프록시 풀 크기 |
 | `save_batch_size` | 500 | DB 저장 배치 크기 |
-| `max_pages` | 250 | 최대 페이지 수 (API 제한) |
 
 ---
 
@@ -149,20 +195,18 @@ username:password_session-{8자}_lifetime-{시간}@geo.iproyal.com:12321
 
 ## 5. 실측 성능 (2026-01-16)
 
-### 크롤링 결과
+### 크롤링 결과 (2026-01-16 최종)
 
 | 항목 | 결과 |
 |------|------|
-| 목록 수집 | 250페이지 → 10,000 unique IDs (API 최대) |
-| 상세 수집 | 10,000건 (100% 성공) |
-| 신규 저장 | 1,707건 |
-| 업데이트 | 8,293건 |
-| 소요 시간 | 38.1분 |
-| 평균 속도 | 4.4건/s |
-| 프록시 전환 | 없음 (직접 연결 유지) |
-| **최종 DB** | **12,140건** |
+| 목록 수집 | 25개 구별 분할 → 69,275건 (합계) |
+| 중복 제거 후 | 약 51,000건 (unique IDs) |
+| 상세 수집 | 51,000건 |
+| 평균 속도 | 12-18건/s (30워커) |
+| 프록시 | IPRoyal 30개 세션 병렬 |
+| **최종 DB** | **50,995건** |
 
-> **참고**: 500페이지 요청했으나 API 제한으로 250페이지 이후 중복 발생 확인됨
+> **참고**: 구별 분할 크롤링으로 API 250페이지 제한 우회. 같은 공고가 여러 구에서 조회되어 합계(69,275) > 실제(51,000)
 
 ### 데이터 품질
 
@@ -354,8 +398,8 @@ Description=Daily Crawler Sync Service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/opt/jobchat/crawler
-ExecStart=/opt/jobchat/crawler/venv/bin/python app/main.py --mode daily
+WorkingDirectory=/opt/jobbot/crawler
+ExecStart=/opt/jobbot/crawler/venv/bin/python app/main.py --mode daily
 User=crawler
 ```
 
@@ -363,16 +407,16 @@ User=crawler
 
 ```bash
 # crontab -e
-0 3 * * 0 cd /opt/jobchat/crawler && ./venv/bin/python app/main.py --mode full
-0 9 * * * cd /opt/jobchat/crawler && ./venv/bin/python app/main.py --mode daily
-0 21 * * * cd /opt/jobchat/crawler && ./venv/bin/python app/main.py --mode deadline
+0 3 * * 0 cd /opt/jobbot/crawler && ./venv/bin/python app/main.py --mode full
+0 9 * * * cd /opt/jobbot/crawler && ./venv/bin/python app/main.py --mode daily
+0 21 * * * cd /opt/jobbot/crawler && ./venv/bin/python app/main.py --mode deadline
 ```
 
 ### 7.4 전체 공고 수집 (구별 필터 크롤링)
 
-> **상태**: 설계 완료, 배포 시 적용
-> **스크립트**: `run_crawl_by_gu.py`
-> **현재**: 10,000건 테스트 모드 유지
+> **상태**: ✅ 구현 완료, 운영 중
+> **스크립트**: `run_crawler.py` (구별 분할 + 중복 제거 내장)
+> **결과**: 51,000건 전체 수집 성공
 
 #### 구별 공고 현황
 
@@ -404,16 +448,15 @@ python run_crawl_by_gu.py
 - 구간 중복율: 15.4%
 ```
 
-#### 예상 성능
+#### 실측 성능 (2026-01-16)
 
 | 항목 | 값 |
 |------|------|
 | 구 수 | 25개 |
-| 총합 | ~83,000건 |
-| 중복 제거 후 | ~60,000-65,000건 |
-| 목록 수집 | ~30분 |
-| 상세 수집 | ~3-4시간 |
-| **총 소요** | **4-5시간** |
+| 구별 합계 | 69,275건 |
+| 중복 제거 후 | **51,000건** |
+| 수집 속도 | 12-18건/s (30워커) |
+| **총 소요** | **약 1-2시간** |
 
 ---
 
@@ -442,6 +485,10 @@ python run_crawl_by_gu.py
 
 | 날짜 | 버전 | 내용 |
 |------|------|------|
+| 2026-01-16 | 2.1 | **서울 전체 51,000건 수집 완료** (구별 분할 + 중복 제거) |
+| 2026-01-16 | 2.1 | 워커 수 확대 (10 → 30), 프록시 풀 30개 |
+| 2026-01-16 | 2.1 | 상세 수집 워커-큐 패턴 리팩토링 (이슈 #013) |
+| 2026-01-16 | 2.1 | 프록시 세션 lifetime 필수화 (이슈 #014) |
 | 2026-01-16 | 2.0 | **API 페이지 제한 발견** (시간대별 가변: 250-500) |
 | 2026-01-16 | 2.0 | 구별 크롤링 전략 설계 (전체 수집용) |
 | 2026-01-16 | 2.0 | V2 운영 검증 완료 (10,000건 성공) |
