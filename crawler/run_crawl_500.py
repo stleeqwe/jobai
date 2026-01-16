@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""V2 크롤러 - 500페이지 크롤링"""
+"""V2 크롤러 - 최대 크롤링 (API 제한 250페이지)"""
 
 import asyncio
 import sys
@@ -13,11 +13,11 @@ from app.db.firestore import save_jobs, get_job_stats, save_crawl_log
 
 
 async def run_crawl_500():
-    """500페이지 크롤링"""
+    """최대 크롤링 (API 제한: 250페이지 = 10,000건)"""
     start_time = datetime.now()
 
     print("=" * 70)
-    print("V2 크롤링 (500페이지 제한)")
+    print("V2 크롤링 (API 제한: 250페이지 = 10,000건)")
     print(f"시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 70)
 
@@ -31,11 +31,11 @@ async def run_crawl_500():
     try:
         await scraper.initialize()
         print(f"[INFO] 서울 전체: {scraper.total_count:,}건")
-        print(f"[INFO] 500페이지 = ~20,000건 수집 예정")
+        print(f"[INFO] API 제한: 250페이지 × 40개 = 10,000건 최대")
 
-        # 500페이지만 크롤링
+        # 250페이지 크롤링 (API 제한)
         success, job_ids, save_stats = await scraper.crawl_all(
-            max_pages=500,
+            max_pages=250,
             save_callback=save_jobs,
             save_batch_size=500,
         )
@@ -67,7 +67,7 @@ async def run_crawl_500():
             "new": save_stats.get("new", 0),
             "updated": save_stats.get("updated", 0),
             "version": "v2",
-            "max_pages": 500,
+            "max_pages": 250,  # API 제한
         })
 
     finally:

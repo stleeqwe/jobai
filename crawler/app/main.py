@@ -1,49 +1,63 @@
-"""크롤러 메인 실행 모듈 - 다중 모드 지원"""
+"""크롤러 메인 실행 모듈 - V2 기반
+
+V2 크롤러 사용:
+- AJAX 엔드포인트 기반
+- 적응형 폴백 (차단 시 프록시 전환)
+
+참고: 운영 환경에서는 run_crawl_500.py 사용 권장
+"""
 
 import argparse
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from app.config import settings
-from app.scrapers import JobKoreaScraper
-from app.db import (
-    save_jobs, save_crawl_log, mark_expired_jobs,
-    expire_by_deadline, get_jobs_for_verification, mark_jobs_expired
-)
+from app.scrapers import JobKoreaScraperV2
+from app.db import save_jobs, save_crawl_log, mark_expired_jobs, expire_by_deadline
 
 
-async def run_full_crawl(num_workers: int = 3):
+async def run_full_crawl(num_workers: int = 10, max_pages: int = 250):
     """
-    전체 크롤링 (최초 1회 또는 전체 갱신)
+    전체 크롤링 (V2 - AJAX 기반)
 
     Args:
-        num_workers: 병렬 워커 수 (기본 3)
+        num_workers: 병렬 워커 수 (기본 10)
+        max_pages: 최대 페이지 수 (기본 250, API 제한)
     """
     print("=" * 60)
-    print(f"[{datetime.now()}] 전체 크롤링 시작")
-    print(f"모드: FULL (병렬 {num_workers} 워커)")
+    print(f"[{datetime.now()}] 전체 크롤링 시작 (V2)")
+    print(f"모드: FULL (워커 {num_workers}개, 최대 {max_pages}페이지)")
     print(f"환경: {settings.ENVIRONMENT}")
     print("=" * 60)
 
     crawl_log = _init_crawl_log("full")
     start_time = datetime.now()
-    scraper = JobKoreaScraper(num_workers=num_workers)
+    scraper = JobKoreaScraperV2(
+        num_workers=num_workers,
+        use_proxy=False,
+        fallback_to_proxy=True,
+    )
 
     try:
-        # 병렬 크롤링 (500건마다 중간 저장)
-        print("\n[Phase 1] 병렬 크롤링 시작 (500건마다 중간 저장)...")
-        job_count, job_ids, save_result = await scraper.crawl_all_parallel(
+        # 초기화
+        await scraper.initialize()
+        print(f"\n[Info] 서울 전체: {scraper.total_count:,}건")
+
+        # V2 크롤링 (목록 + 상세, 500건마다 저장)
+        print("\n[Phase 1] V2 크롤링 시작...")
+        job_count, job_ids, save_result = await scraper.crawl_all(
+            max_pages=max_pages,
             save_callback=save_jobs,
-            save_batch_size=500
+            save_batch_size=500,
         )
         crawl_log["total_crawled"] = job_count
 
         if job_count > 0:
-            # 저장 결과 반영 (이미 중간 저장됨)
+            # 저장 결과 반영
             print(f"\n[Phase 2] 저장 완료 (총 {job_count}건)")
             _update_log_from_save(crawl_log, save_result)
 
-            # 미등장 공고 만료 처리 (크롤링에서 발견되지 않은 공고)
+            # 미등장 공고 만료 처리
             print("\n[Phase 3] 미등장 공고 만료 처리...")
             expired_missing = await mark_expired_jobs(job_ids)
             print(f"  - 미등장 만료: {expired_missing}건")
@@ -65,111 +79,6 @@ async def run_full_crawl(num_workers: int = 3):
         crawl_log["status"] = "failed"
         crawl_log["error"] = str(e)
         print(f"\n[Error] 크롤링 실패: {e}")
-        import traceback
-        traceback.print_exc()
-
-    finally:
-        await scraper.close()
-        await _finalize_crawl(crawl_log, start_time)
-
-
-async def run_hourly_update(count: int = 200):
-    """
-    매시간 증분 업데이트
-
-    Args:
-        count: 수집할 최신 공고 수 (기본 200, 피크시간 500)
-    """
-    # 피크 시간 체크 (평일 09-11시)
-    now = datetime.now()
-    is_peak = now.weekday() < 5 and 9 <= now.hour < 11
-    if is_peak:
-        count = max(count, 500)
-        print(f"[Info] 피크 시간대 감지, 수집량 증가: {count}건")
-
-    print("=" * 60)
-    print(f"[{datetime.now()}] 증분 업데이트 시작")
-    print(f"모드: HOURLY (최신 {count}건)")
-    print("=" * 60)
-
-    crawl_log = _init_crawl_log("hourly")
-    start_time = datetime.now()
-    scraper = JobKoreaScraper(num_workers=1)
-
-    try:
-        # 최신 공고 수집
-        print("\n[Phase 1] 최신 공고 수집...")
-        jobs = await scraper.crawl_latest(count=count)
-        crawl_log["total_crawled"] = len(jobs)
-
-        if jobs:
-            # DB 저장 (upsert)
-            print(f"\n[Phase 2] DB 저장 ({len(jobs)}건)...")
-            save_result = await save_jobs(jobs)
-            _update_log_from_save(crawl_log, save_result)
-
-        # 마감일 기준 자동 만료 처리
-        print("\n[Phase 3] 마감일 기준 만료 처리...")
-        expired_count = await expire_by_deadline()
-        crawl_log["expired_jobs"] = expired_count
-        print(f"  - 마감일 만료: {expired_count}건")
-
-        crawl_log["status"] = "success"
-
-    except Exception as e:
-        crawl_log["status"] = "failed"
-        crawl_log["error"] = str(e)
-        print(f"\n[Error] 업데이트 실패: {e}")
-        import traceback
-        traceback.print_exc()
-
-    finally:
-        await scraper.close()
-        await _finalize_crawl(crawl_log, start_time)
-
-
-async def run_daily_verification():
-    """
-    매일 새벽 URL 검증 (활성 공고의 15% 검증)
-    """
-    print("=" * 60)
-    print(f"[{datetime.now()}] 일일 검증 시작")
-    print(f"모드: DAILY VERIFICATION")
-    print("=" * 60)
-
-    crawl_log = _init_crawl_log("daily_verification")
-    start_time = datetime.now()
-    scraper = JobKoreaScraper(num_workers=1)
-
-    try:
-        # 검증 대상 조회 (7일 이상 미검증 + 상시채용 90일 이상)
-        print("\n[Phase 1] 검증 대상 조회...")
-        job_ids = await get_jobs_for_verification(
-            days_since_verified=7,  # 7일간 미검증
-            max_count=10000,  # 최대 1만건
-        )
-        print(f"  - 검증 대상: {len(job_ids)}건")
-
-        if job_ids:
-            # URL 검증 (HEAD 요청)
-            print("\n[Phase 2] URL 검증...")
-            results = await scraper.verify_jobs(job_ids)
-
-            # 만료된 공고 처리
-            expired_ids = [jid for jid, valid in results.items() if not valid]
-            if expired_ids:
-                print(f"\n[Phase 3] 만료 공고 처리 ({len(expired_ids)}건)...")
-                await mark_jobs_expired(expired_ids)
-
-            crawl_log["total_crawled"] = len(job_ids)
-            crawl_log["expired_jobs"] = len(expired_ids)
-
-        crawl_log["status"] = "success"
-
-    except Exception as e:
-        crawl_log["status"] = "failed"
-        crawl_log["error"] = str(e)
-        print(f"\n[Error] 검증 실패: {e}")
         import traceback
         traceback.print_exc()
 
@@ -240,34 +149,25 @@ async def _finalize_crawl(crawl_log: dict, start_time: datetime):
 
 async def main():
     """CLI 진입점"""
-    parser = argparse.ArgumentParser(description="JobChat 크롤러")
-    parser.add_argument(
-        "--mode",
-        choices=["full", "hourly", "daily"],
-        default="hourly",
-        help="크롤링 모드 (full: 전체, hourly: 증분, daily: 검증)"
+    parser = argparse.ArgumentParser(
+        description="JobChat 크롤러 V2",
+        epilog="참고: 운영 환경에서는 run_crawl_500.py 사용 권장",
     )
     parser.add_argument(
         "--workers",
         type=int,
-        default=3,
-        help="병렬 워커 수 (full 모드, 기본 3)"
+        default=10,
+        help="병렬 워커 수 (기본 10)",
     )
     parser.add_argument(
-        "--count",
+        "--pages",
         type=int,
-        default=200,
-        help="수집 건수 (hourly 모드, 기본 200)"
+        default=250,
+        help="최대 페이지 수 (기본 250, API 제한)",
     )
 
     args = parser.parse_args()
-
-    if args.mode == "full":
-        await run_full_crawl(num_workers=args.workers)
-    elif args.mode == "hourly":
-        await run_hourly_update(count=args.count)
-    elif args.mode == "daily":
-        await run_daily_verification()
+    await run_full_crawl(num_workers=args.workers, max_pages=args.pages)
 
 
 if __name__ == "__main__":

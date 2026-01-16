@@ -27,9 +27,9 @@ from app.models.types import (
 from app.services.job_search import (
     search_jobs_with_commute,
     format_job_results,
-    _matches_company_location,
     _calculate_commute_times
 )
+from app.utils.filters import matches_salary, matches_company_location
 
 logger = logging.getLogger(__name__)
 
@@ -165,20 +165,9 @@ class ConversationMemory:
         filtered = []
         source_jobs = jobs if jobs is not None else self.last_search_results
         for job in source_jobs:
-            # 연봉 필터 - 명시된 연봉만 포함 (회사내규 제외)
-            if salary_min is not None and salary_min > 0:
-                job_salary = job.get("salary_min")
-                # 연봉 정보 없으면 (회사내규) 제외
-                if job_salary is None:
-                    continue
-                # 연봉이 조건 미달이면 제외
-                if job_salary < salary_min:
-                    continue
-
-            if salary_max is not None:
-                job_salary = job.get("salary_max") or job.get("salary_min")
-                if job_salary and job_salary > salary_max:
-                    continue
+            # 연봉 필터 (공용 유틸리티 사용)
+            if not matches_salary(job, salary_min or 0, salary_max):
+                continue
 
             # 통근시간 필터
             if commute_max_minutes is not None:
@@ -186,8 +175,8 @@ class ConversationMemory:
                 if commute is None or commute > commute_max_minutes:
                     continue
 
-            # 회사 위치 필터
-            if company_location and not _matches_company_location(job, company_location):
+            # 회사 위치 필터 (공용 유틸리티 사용)
+            if company_location and not matches_company_location(job, company_location):
                 continue
 
             filtered.append(job)
@@ -239,6 +228,245 @@ class GeminiService:
 
         return SYSTEM_PROMPT_TEMPLATE.format(user_location_info=location_info)
 
+    async def _handle_search_jobs(
+        self,
+        function_call,
+        memory: "ConversationMemory",
+        user_location: Optional[UserLocationDict],
+        config: types.GenerateContentConfig
+    ) -> GeminiResultDict:
+        """search_jobs 함수 호출 처리
+
+        Args:
+            function_call: Gemini Function Call 객체
+            memory: 대화 메모리
+            user_location: 사용자 위치 정보
+            config: Gemini 설정
+
+        Returns:
+            검색 결과를 포함한 응답
+        """
+        params = dict(function_call.args) if function_call.args else {}
+
+        # 후속 검색인 경우 이전 파라미터 병합 (직무가 동일/유사할 때)
+        if memory.last_search_params:
+            prev_keywords = set(k.lower() for k in memory.last_search_params.get("job_keywords", []))
+            new_keywords = set(k.lower() for k in params.get("job_keywords", []))
+
+            # 직무 키워드가 겹치면 후속 검색으로 판단
+            keywords_overlap = bool(prev_keywords & new_keywords) if prev_keywords and new_keywords else False
+
+            if keywords_overlap:
+                logger.info(f"후속 검색 감지: 이전 params 병합 (overlap: {prev_keywords & new_keywords})")
+                merged_params = {**memory.last_search_params}
+                for key, value in params.items():
+                    if value is not None:
+                        merged_params[key] = value
+                params = merged_params
+                logger.info(f"병합 결과: {params}")
+
+        # 사용자 위치 (통근시간 계산용)
+        user_loc = getattr(memory, 'user_location', None) or user_location
+        commute_origin = ""
+        if user_loc:
+            if user_loc.get("address"):
+                commute_origin = user_loc["address"]
+            else:
+                commute_origin = f"{user_loc['latitude']},{user_loc['longitude']}"
+
+        company_location = params.get("company_location", "")
+        commute_max = params.get("commute_max_minutes")
+
+        logger.info(f"search_jobs 호출: keywords={params.get('job_keywords')}, "
+                   f"salary={params.get('salary_min')}, company_loc={company_location}, "
+                   f"commute_from={commute_origin}, commute_max={commute_max}")
+
+        # 검색 수행
+        search_result = await search_jobs_with_commute(
+            job_keywords=params.get("job_keywords", []),
+            salary_min=params.get("salary_min", 0),
+            salary_max=params.get("salary_max"),
+            commute_origin=commute_origin,
+            commute_max_minutes=commute_max,
+            company_location=company_location
+        )
+
+        # 메모리에 저장
+        memory.save_search(search_result["jobs"], params)
+
+        # 첫 50건만 LLM에 전달
+        first_batch = memory.get_next_batch(50)
+        jobs_for_llm = self._format_jobs_for_llm(first_batch)
+
+        # Function Response를 히스토리에 추가
+        function_response_content = types.Content(
+            role="user",
+            parts=[types.Part(
+                function_response=types.FunctionResponse(
+                    name="search_jobs",
+                    response={
+                        "total_count": search_result["total_count"],
+                        "returned_count": len(first_batch),
+                        "has_more": memory.has_more(),
+                        "jobs": jobs_for_llm
+                    }
+                )
+            )]
+        )
+        memory.history.append(function_response_content)
+
+        # 검색 결과를 LLM에 전달
+        result_response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=memory.history,
+            config=config
+        )
+
+        response_text = self._extract_text(result_response)
+        memory.add_model_message(response_text)
+
+        return {
+            "response": response_text,
+            "jobs": format_job_results(first_batch),
+            "pagination": {
+                "total_count": search_result["total_count"],
+                "displayed": len(first_batch),
+                "has_more": memory.has_more(),
+                "remaining": memory.get_remaining_count()
+            },
+            "search_params": params,
+            "success": True
+        }
+
+    async def _handle_filter_results(
+        self,
+        function_call,
+        memory: "ConversationMemory",
+        user_location: Optional[UserLocationDict],
+        config: types.GenerateContentConfig
+    ) -> GeminiResultDict:
+        """filter_results 함수 호출 처리
+
+        Args:
+            function_call: Gemini Function Call 객체
+            memory: 대화 메모리
+            user_location: 사용자 위치 정보
+            config: Gemini 설정
+
+        Returns:
+            필터링 결과를 포함한 응답
+        """
+        params = dict(function_call.args) if function_call.args else {}
+
+        logger.info(f"filter_results 호출: salary_min={params.get('salary_min')}, "
+                   f"salary_max={params.get('salary_max')}, "
+                   f"commute_max={params.get('commute_max_minutes')}, "
+                   f"company_location={params.get('company_location')}")
+
+        # 캐시된 결과가 없으면 안내
+        if not memory.last_search_results:
+            response_text = "먼저 검색을 해주세요. 어떤 직무의 채용공고를 찾고 계신가요?"
+            memory.add_model_message(response_text)
+            return {
+                "response": response_text,
+                "jobs": [],
+                "pagination": None,
+                "success": True
+            }
+
+        commute_max = params.get("commute_max_minutes")
+        base_jobs = memory.last_search_results
+
+        # 통근시간 필터 요청인데 캐시에 통근정보가 없으면 재계산
+        if commute_max is not None:
+            has_commute = any(
+                job.get("commute_minutes") is not None for job in base_jobs
+            )
+            if not has_commute:
+                user_loc = getattr(memory, "user_location", None)
+                if not user_loc:
+                    response_text = (
+                        "통근시간 필터를 적용하려면 현재 위치 정보가 필요해요. "
+                        "위치 권한을 허용하거나 출발지를 알려주세요."
+                    )
+                    memory.add_model_message(response_text)
+                    return {
+                        "response": response_text,
+                        "jobs": [],
+                        "pagination": None,
+                        "success": True
+                    }
+
+                if user_loc.get("address"):
+                    commute_origin = user_loc["address"]
+                else:
+                    commute_origin = f"{user_loc['latitude']},{user_loc['longitude']}"
+
+                base_jobs = await _calculate_commute_times(
+                    jobs=base_jobs,
+                    origin=commute_origin,
+                    max_minutes=commute_max
+                )
+
+        # 필터링 수행
+        filtered_jobs = memory.filter_cached_results(
+            salary_min=params.get("salary_min"),
+            salary_max=params.get("salary_max"),
+            commute_max_minutes=params.get("commute_max_minutes"),
+            company_location=params.get("company_location"),
+            jobs=base_jobs
+        )
+
+        # 필터링 결과를 새로운 캐시로 저장
+        original_count = len(base_jobs)
+        merged_params = {**memory.last_search_params, **params}
+        memory.save_search(filtered_jobs, merged_params)
+
+        # 첫 50건만 LLM에 전달
+        first_batch = memory.get_next_batch(50)
+        jobs_for_llm = self._format_jobs_for_llm(first_batch)
+
+        # Function Response를 히스토리에 추가
+        function_response_content = types.Content(
+            role="user",
+            parts=[types.Part(
+                function_response=types.FunctionResponse(
+                    name="filter_results",
+                    response={
+                        "original_count": original_count,
+                        "filtered_count": len(filtered_jobs),
+                        "returned_count": len(first_batch),
+                        "has_more": memory.has_more(),
+                        "jobs": jobs_for_llm
+                    }
+                )
+            )]
+        )
+        memory.history.append(function_response_content)
+
+        # 필터링 결과를 LLM에 전달
+        result_response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=memory.history,
+            config=config
+        )
+
+        response_text = self._extract_text(result_response)
+        memory.add_model_message(response_text)
+
+        return {
+            "response": response_text,
+            "jobs": format_job_results(first_batch),
+            "pagination": {
+                "total_count": len(filtered_jobs),
+                "displayed": len(first_batch),
+                "has_more": memory.has_more(),
+                "remaining": memory.get_remaining_count()
+            },
+            "search_params": merged_params,
+            "success": True
+        }
+
     async def process_message(
         self,
         message: str,
@@ -285,222 +513,18 @@ class GeminiService:
                 config=config
             )
 
-            # Function Call 확인
+            # Function Call 확인 및 분기 처리
             function_call = self._extract_function_call(response)
 
             if function_call and function_call.name == "search_jobs":
-                # 검색 실행
-                params = dict(function_call.args) if function_call.args else {}
-
-                # 후속 검색인 경우 이전 파라미터 병합 (직무가 동일/유사할 때)
-                # 이를 통해 "연봉 5000 이상만"처럼 일부 조건만 변경해도 이전 조건 유지
-                if memory.last_search_params:
-                    prev_keywords = set(k.lower() for k in memory.last_search_params.get("job_keywords", []))
-                    new_keywords = set(k.lower() for k in params.get("job_keywords", []))
-
-                    # 직무 키워드가 겹치면 후속 검색으로 판단
-                    keywords_overlap = bool(prev_keywords & new_keywords) if prev_keywords and new_keywords else False
-
-                    if keywords_overlap:
-                        logger.info(f"후속 검색 감지: 이전 params 병합 (overlap: {prev_keywords & new_keywords})")
-                        merged_params = {**memory.last_search_params}
-                        # 새로 지정된 파라미터로 덮어쓰기 (None이 아닌 값만)
-                        for key, value in params.items():
-                            if value is not None:
-                                merged_params[key] = value
-                        params = merged_params
-                        logger.info(f"병합 결과: {params}")
-
-                # 사용자 위치 (통근시간 계산용 - 항상 사용자 현재 위치 사용)
-                user_loc = getattr(memory, 'user_location', None) or user_location
-                commute_origin = ""
-                if user_loc:
-                    if user_loc.get("address"):
-                        commute_origin = user_loc["address"]
-                    else:
-                        commute_origin = f"{user_loc['latitude']},{user_loc['longitude']}"
-
-                # 회사 위치 필터 (LLM이 설정한 경우)
-                company_location = params.get("company_location", "")
-
-                logger.info(f"search_jobs 호출: keywords={params.get('job_keywords')}, "
-                           f"salary={params.get('salary_min')}, company_loc={company_location}, "
-                           f"commute_from={commute_origin}")
-
-                # 통근시간 필터 (사용자가 명시한 경우만)
-                commute_max = params.get("commute_max_minutes")  # None이면 통근시간 계산 안 함
-
-                logger.info(f"commute_max_minutes={commute_max}")
-
-                # 검색 수행
-                search_result = await search_jobs_with_commute(
-                    job_keywords=params.get("job_keywords", []),
-                    salary_min=params.get("salary_min", 0),
-                    salary_max=params.get("salary_max"),
-                    commute_origin=commute_origin,  # 항상 전달 → 통근시간 항상 계산
-                    commute_max_minutes=commute_max,  # None이면 통근시간 계산/필터 건너뜀
-                    company_location=company_location  # 회사 위치 필터
+                return await self._handle_search_jobs(
+                    function_call, memory, user_location, config
                 )
-
-                # 메모리에 저장
-                memory.save_search(search_result["jobs"], params)
-
-                # 첫 50건만 LLM에 전달
-                first_batch = memory.get_next_batch(50)
-                jobs_for_llm = self._format_jobs_for_llm(first_batch)
-
-                # Function Response를 히스토리에 추가
-                function_response_content = types.Content(
-                    role="user",
-                    parts=[types.Part(
-                        function_response=types.FunctionResponse(
-                            name="search_jobs",
-                            response={
-                                "total_count": search_result["total_count"],
-                                "returned_count": len(first_batch),
-                                "has_more": memory.has_more(),
-                                "jobs": jobs_for_llm
-                            }
-                        )
-                    )]
-                )
-                memory.history.append(function_response_content)
-
-                # 검색 결과를 LLM에 전달
-                result_response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=memory.history,
-                    config=config
-                )
-
-                response_text = self._extract_text(result_response)
-                memory.add_model_message(response_text)
-
-                return {
-                    "response": response_text,
-                    "jobs": format_job_results(first_batch),
-                    "pagination": {
-                        "total_count": search_result["total_count"],
-                        "displayed": len(first_batch),
-                        "has_more": memory.has_more(),
-                        "remaining": memory.get_remaining_count()
-                    },
-                    "search_params": params,
-                    "success": True
-                }
 
             elif function_call and function_call.name == "filter_results":
-                # 기존 결과 필터링
-                params = dict(function_call.args) if function_call.args else {}
-
-                logger.info(f"filter_results 호출: salary_min={params.get('salary_min')}, "
-                           f"salary_max={params.get('salary_max')}, "
-                           f"commute_max={params.get('commute_max_minutes')}, "
-                           f"company_location={params.get('company_location')}")
-
-                # 캐시된 결과가 없으면 안내
-                if not memory.last_search_results:
-                    response_text = "먼저 검색을 해주세요. 어떤 직무의 채용공고를 찾고 계신가요?"
-                    memory.add_model_message(response_text)
-                    return {
-                        "response": response_text,
-                        "jobs": [],
-                        "pagination": None,
-                        "success": True
-                    }
-
-                commute_max = params.get("commute_max_minutes")
-                base_jobs = memory.last_search_results
-
-                # 통근시간 필터 요청인데 캐시에 통근정보가 없으면 재계산
-                if commute_max is not None:
-                    has_commute = any(
-                        job.get("commute_minutes") is not None for job in base_jobs
-                    )
-                    if not has_commute:
-                        user_loc = getattr(memory, "user_location", None)
-                        if not user_loc:
-                            response_text = (
-                                "통근시간 필터를 적용하려면 현재 위치 정보가 필요해요. "
-                                "위치 권한을 허용하거나 출발지를 알려주세요."
-                            )
-                            memory.add_model_message(response_text)
-                            return {
-                                "response": response_text,
-                                "jobs": [],
-                                "pagination": None,
-                                "success": True
-                            }
-
-                        if user_loc.get("address"):
-                            commute_origin = user_loc["address"]
-                        else:
-                            commute_origin = f"{user_loc['latitude']},{user_loc['longitude']}"
-
-                        base_jobs = await _calculate_commute_times(
-                            jobs=base_jobs,
-                            origin=commute_origin,
-                            max_minutes=commute_max
-                        )
-
-                # 필터링 수행
-                filtered_jobs = memory.filter_cached_results(
-                    salary_min=params.get("salary_min"),
-                    salary_max=params.get("salary_max"),
-                    commute_max_minutes=params.get("commute_max_minutes"),
-                    company_location=params.get("company_location"),
-                    jobs=base_jobs
+                return await self._handle_filter_results(
+                    function_call, memory, user_location, config
                 )
-
-                # 필터링 결과를 새로운 캐시로 저장
-                original_count = len(base_jobs)
-                merged_params = {**memory.last_search_params, **params}
-                memory.save_search(filtered_jobs, merged_params)
-
-                # 첫 50건만 LLM에 전달
-                first_batch = memory.get_next_batch(50)
-                jobs_for_llm = self._format_jobs_for_llm(first_batch)
-
-                # Function Response를 히스토리에 추가
-                function_response_content = types.Content(
-                    role="user",
-                    parts=[types.Part(
-                        function_response=types.FunctionResponse(
-                            name="filter_results",
-                            response={
-                                "original_count": original_count,
-                                "filtered_count": len(filtered_jobs),
-                                "returned_count": len(first_batch),
-                                "has_more": memory.has_more(),
-                                "jobs": jobs_for_llm
-                            }
-                        )
-                    )]
-                )
-                memory.history.append(function_response_content)
-
-                # 필터링 결과를 LLM에 전달
-                result_response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=memory.history,
-                    config=config
-                )
-
-                response_text = self._extract_text(result_response)
-                memory.add_model_message(response_text)
-
-                return {
-                    "response": response_text,
-                    "jobs": format_job_results(first_batch),
-                    "pagination": {
-                        "total_count": len(filtered_jobs),
-                        "displayed": len(first_batch),
-                        "has_more": memory.has_more(),
-                        "remaining": memory.get_remaining_count()
-                    },
-                    "search_params": merged_params,  # 병합된 전체 파라미터 반환 (search_params로 통일)
-                    "success": True
-                }
 
             else:
                 # Function Call 없음 - 텍스트 응답

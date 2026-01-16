@@ -11,6 +11,9 @@ from typing import Any, Dict, List, Optional
 from app.db import get_db
 from app.models.types import JobDict, FormattedJobDict, SearchResultDict
 from app.services.subway import subway_service
+from app.utils.filters import matches_salary, matches_company_location
+from app.utils.keyword_matcher import calculate_match_score, matches_keywords
+from app.utils.commute import calculate_commutes, filter_and_enrich
 
 logger = logging.getLogger(__name__)
 
@@ -133,16 +136,16 @@ async def _filter_from_db(
             job = doc.to_dict()
 
             # 직무 키워드 매칭
-            match_score = _keyword_match_score(job, job_keywords)
+            match_score = calculate_match_score(job, job_keywords)
             if match_score == 0:
                 continue
 
             # 연봉 필터
-            if not _matches_salary(job, salary_min, salary_max):
+            if not matches_salary(job, salary_min, salary_max):
                 continue
 
             # 회사 위치 필터
-            if company_location and not _matches_company_location(job, company_location):
+            if company_location and not matches_company_location(job, company_location):
                 continue
 
             jobs_with_scores.append((match_score, seen, job))
@@ -160,245 +163,6 @@ async def _filter_from_db(
         return []
 
 
-def _keyword_match_score(job: Dict, keywords: List[str]) -> int:
-    """
-    직무 키워드 매칭 스코어
-
-    우선순위:
-    - title 매칭: 3점
-    - job_type_raw 매칭: 2점
-    - job_keywords 매칭: 1점
-    """
-    if not keywords:
-        return 1
-
-    title = job.get("title", "").lower()
-    job_type_raw = job.get("job_type_raw", "").lower()
-    job_keywords_field = [k.lower() for k in job.get("job_keywords", [])]
-    search_text = f"{title} {job_type_raw}"
-    search_text_no_space = search_text.replace(" ", "")
-
-    title_matched = False
-    job_type_matched = False
-    keywords_matched = False
-
-    for keyword in keywords:
-        kw = keyword.lower().strip()
-        if len(kw) < 2:
-            continue
-
-        kw_no_space = kw.replace(" ", "")
-
-        if kw in search_text or kw_no_space in search_text or kw_no_space in search_text_no_space:
-            if kw in title or kw_no_space in title or kw_no_space in title.replace(" ", ""):
-                title_matched = True
-            if kw in job_type_raw or kw_no_space in job_type_raw or kw_no_space in job_type_raw.replace(" ", ""):
-                job_type_matched = True
-
-        if not keywords_matched:
-            for jk in job_keywords_field:
-                if kw in jk or kw_no_space in jk or jk in kw or jk in kw_no_space:
-                    keywords_matched = True
-                    break
-
-    score = 0
-    if title_matched:
-        score += 3
-    if job_type_matched:
-        score += 2
-    if keywords_matched:
-        score += 1
-
-    return score
-
-
-def _matches_keywords(job: Dict, keywords: List[str]) -> bool:
-    """직무 키워드 매칭 여부"""
-    return _keyword_match_score(job, keywords) > 0
-
-
-def _matches_salary(job: Dict, salary_min: int, salary_max: Optional[int]) -> bool:
-    """연봉 조건 매칭
-
-    정책:
-    - salary_min > 0 이면: 명시된 연봉이 있고 조건 충족하는 공고만 (회사내규 제외)
-    - salary_min = 0 이면: 모든 공고 포함 (회사내규 포함)
-    """
-    if salary_min == 0 and salary_max is None:
-        return True  # 연봉 무관 - 전부 포함
-
-    job_salary_min = job.get("salary_min")
-    job_salary_max = job.get("salary_max")
-
-    # salary_min > 0 인데 공고에 연봉 정보 없으면 (회사내규, 협의) → 제외
-    if salary_min > 0 and job_salary_min is None:
-        return False
-
-    # 최소 연봉 조건
-    if salary_min > 0 and job_salary_min is not None:
-        # 공고의 최대 연봉이 요구 최소보다 낮으면 제외
-        if job_salary_max and job_salary_max < salary_min:
-            return False
-        # 공고의 최소 연봉만 있으면 그걸로 비교
-        if job_salary_min < salary_min:
-            # 최대 연봉이 없으면 최소 연봉으로 판단
-            if not job_salary_max:
-                return False
-
-    # 최대 연봉 조건 (선택)
-    if salary_max:
-        if job_salary_min and job_salary_min > salary_max:
-            return False
-
-    return True
-
-
-# 역명 → 구/지역 매핑 (회사 위치 필터용)
-STATION_TO_DISTRICT = {
-    # 강남구
-    "강남역": ["강남구", "강남"],
-    "역삼역": ["강남구", "역삼"],
-    "선릉역": ["강남구", "선릉"],
-    "삼성역": ["강남구", "삼성"],
-    "논현역": ["강남구", "논현"],
-    "신논현역": ["강남구", "강남"],
-    "압구정역": ["강남구", "압구정"],
-    # 서초구
-    "서초역": ["서초구", "서초"],
-    "교대역": ["서초구", "서초"],
-    "양재역": ["서초구", "양재"],
-    # 송파구
-    "잠실역": ["송파구", "잠실"],
-    "석촌역": ["송파구", "석촌"],
-    # 강동구
-    "천호역": ["강동구", "천호"],
-    # 광진구
-    "건대입구역": ["광진구", "광진", "건대"],
-    # 마포구
-    "홍대입구역": ["마포구", "마포", "홍대"],
-    "합정역": ["마포구", "마포", "합정"],
-    "상수역": ["마포구", "상수"],
-    "망원역": ["마포구", "망원"],
-    # 영등포구
-    "여의도역": ["영등포구", "여의도"],
-    "영등포구청역": ["영등포구", "영등포"],
-    "당산역": ["영등포구", "당산"],
-    # 용산구
-    "용산역": ["용산구", "용산"],
-    "이태원역": ["용산구", "이태원"],
-    # 종로구
-    "광화문역": ["종로구", "종로", "광화문"],
-    "종각역": ["종로구", "종로"],
-    "안국역": ["종로구", "종로", "안국"],
-    # 중구
-    "을지로역": ["중구", "을지로"],
-    "명동역": ["중구", "명동"],
-    "충무로역": ["중구", "충무로"],
-    "서울역": ["중구", "용산구", "서울역"],
-    # 성동구
-    "성수역": ["성동구", "성수"],
-    "뚝섬역": ["성동구", "성수"],
-    "왕십리역": ["성동구", "왕십리"],
-    # 금천구/구로구
-    "가산디지털단지역": ["금천구", "가산"],
-    "구로디지털단지역": ["구로구", "구로"],
-    "독산역": ["금천구", "독산"],
-    # 기타
-    "판교역": ["판교", "분당"],
-    "신도림역": ["구로구", "신도림"],
-}
-
-# 동/지역 → 구 매핑
-DONG_TO_DISTRICT = {
-    "성수동": "성동구",
-    "성수": "성동구",
-    "여의도": "영등포구",
-    "여의도동": "영등포구",
-    "테헤란로": "강남구",
-    "삼성동": "강남구",
-    "역삼동": "강남구",
-    "논현동": "강남구",
-    "신사동": "강남구",
-    "청담동": "강남구",
-    "서초동": "서초구",
-    "반포동": "서초구",
-    "잠실동": "송파구",
-    "문정동": "송파구",
-    "가산동": "금천구",
-    "구로동": "구로구",
-    "홍대": "마포구",
-    "망원동": "마포구",
-    "합정동": "마포구",
-    "상암동": "마포구",
-    "이태원동": "용산구",
-}
-
-
-def _matches_company_location(job: Dict, company_location: str) -> bool:
-    """
-    회사 위치 필터링
-
-    company_location이 주어지면 해당 지역에 위치한 회사만 통과
-
-    지원 형식:
-    - 역명: "강남역", "서울역 부근" → 해당 역 인근 구/지역
-    - 구명: "강남구", "서초구" → 해당 구
-    - 동명: "성수동", "여의도" → 해당 동/구
-    """
-    import re
-
-    if not company_location:
-        return True
-
-    location_full = (job.get("location_full") or "").lower()
-    location_gugun = (job.get("location_gugun") or "").lower()
-
-    # 정규화: 부근/근처 제거, 끝의 "역"만 제거 (역삼 → 역삼 유지)
-    cleaned = company_location.lower().strip()
-    cleaned = re.sub(r'(근처|부근|인근|주변)$', '', cleaned).strip()
-
-    search_terms = []
-
-    # 1. 역명 확인 (끝이 "역"이거나 STATION_TO_DISTRICT에 있음)
-    station_key = cleaned if cleaned.endswith("역") else cleaned + "역"
-    if station_key in [s.lower() for s in STATION_TO_DISTRICT.keys()]:
-        # 정확한 키 찾기
-        for station, districts in STATION_TO_DISTRICT.items():
-            if station.lower() == station_key:
-                search_terms.extend([d.lower() for d in districts])
-                break
-    # "역" 없이 입력된 경우도 체크 (강남 → 강남역)
-    elif not cleaned.endswith("역"):
-        for station, districts in STATION_TO_DISTRICT.items():
-            station_base = station.replace("역", "").lower()
-            if station_base == cleaned:
-                search_terms.extend([d.lower() for d in districts])
-                break
-
-    # 2. 동/지역명 확인
-    if not search_terms:
-        for dong, gu in DONG_TO_DISTRICT.items():
-            if dong.lower() in cleaned or cleaned in dong.lower():
-                search_terms.append(gu.lower())
-                search_terms.append(dong.lower())
-                break
-
-    # 3. 구 이름 확인
-    if "구" in cleaned:
-        search_terms.append(cleaned)
-
-    # 4. 폴백: 원본 텍스트 그대로 사용
-    if not search_terms:
-        search_terms.append(cleaned)
-
-    # 매칭 확인
-    for term in search_terms:
-        if term in location_full or term in location_gugun:
-            return True
-
-    return False
-
-
 async def _calculate_commute_times(
     jobs: List[JobDict],
     origin: str,
@@ -414,45 +178,13 @@ async def _calculate_commute_times(
     """
     if not subway_service.is_available():
         logger.warning("지하철 서비스 사용 불가 - 필터 없이 반환")
-        # 서비스 불가 시 commute_minutes 없이 반환
         return jobs
 
-    results = []
+    # 통근시간 계산 (순수 계산, 필터링 없음)
+    job_commute_pairs = calculate_commutes(jobs, origin, subway_service)
 
-    for job in jobs:
-        # 공고 위치 정보
-        job_location = job.get("location_full") or job.get("location_gugun", "")
-
-        if not job_location:
-            if max_minutes is None:
-                results.append(dict(job))
-            continue
-
-        # 통근시간 계산
-        commute = subway_service.calculate(origin, job_location)
-
-        if commute is None:
-            if max_minutes is None:
-                results.append(dict(job))
-            continue
-
-        commute_minutes = commute.get("minutes", 999)
-
-        if max_minutes is not None and commute_minutes > max_minutes:
-            continue
-
-        job_copy = dict(job)
-        job_copy["commute_minutes"] = commute_minutes
-        job_copy["commute_text"] = commute.get("text", f"{commute_minutes}분")
-        job_copy["commute_detail"] = {
-            "origin_station": commute.get("origin_station"),
-            "dest_station": commute.get("destination_station"),
-            "origin_walk": commute.get("origin_walk", 0),
-            "dest_walk": commute.get("destination_walk", 0)
-        }
-        results.append(job_copy)
-
-    return results
+    # 필터링 및 데이터 보강
+    return filter_and_enrich(job_commute_pairs, max_minutes)
 
 
 def format_job_results(jobs: List[JobDict]) -> List[FormattedJobDict]:
