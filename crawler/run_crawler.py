@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
-"""V2 크롤러 - 구별 병렬 크롤링 (API 250페이지 제한 우회)
+"""JobBot 크롤러 - 서울시 전체 채용공고 수집
 
-강남구(16,000+건)는 jobtype+career 조합으로 분할하여 전수 수집
+메인 크롤러 스크립트:
+- 구별 분할 크롤링으로 API 250페이지 제한 우회
+- 강남구(16,000+건)는 jobtype+career 조합으로 추가 분할
+- 프록시 풀 모드로 안정적 수집
+- --skip-existing 옵션으로 증분 크롤링 지원
+
+사용법:
+    python run_crawler.py                 # 전체 크롤링
+    python run_crawler.py --skip-existing # 신규 공고만 크롤링
+    python run_crawler.py --list-only     # 목록만 수집 (상세 스킵)
 """
 
+import argparse
 import asyncio
 import sys
 import os
@@ -14,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.scrapers.jobkorea_v2 import JobKoreaScraperV2
 from app.core.ajax_client import AdaptiveRateLimiter
-from app.db.firestore import save_jobs, get_job_stats, save_crawl_log
+from app.db.firestore import save_jobs, get_job_stats, save_crawl_log, get_existing_job_ids
 from app.logging_config import get_logger
 
 logger = get_logger("crawler.gu")
@@ -196,24 +206,34 @@ async def crawl_list_with_params(scraper: JobKoreaScraperV2, params: Dict, max_p
     return collected_ids
 
 
-async def run_crawl_by_gu():
-    """구별 병렬 크롤링"""
+async def run_crawler(skip_existing: bool = False, list_only: bool = False):
+    """
+    메인 크롤링 실행
+
+    Args:
+        skip_existing: True면 DB에 있는 공고 상세 크롤링 스킵
+        list_only: True면 목록만 수집하고 상세 크롤링 스킵
+    """
     start_time = datetime.now()
 
     print("=" * 70)
-    print("V2 구별 크롤링 (API 250페이지 제한 우회)")
+    print("JobBot 크롤러 - 서울시 전체 채용공고 수집")
     print(f"시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"모드: {'증분 (신규만)' if skip_existing else '전체'}")
+    if list_only:
+        print("주의: 목록만 수집 (상세 크롤링 스킵)")
     print("=" * 70)
 
     # DB 상태
     stats_before = await get_job_stats()
-    print(f"\n[DB] 현재: {stats_before['total_jobs']:,}건")
+    print(f"\n[DB] 현재: {stats_before['total_jobs']:,}건, 활성: {stats_before['active_jobs']:,}건")
 
     # 전체 ID 수집
     all_ids: Set[str] = set()
     gu_stats: Dict[str, int] = {}
 
     # 구별 순차 크롤링 (병렬은 차단 위험)
+    print("\n[Phase 1] 목록 수집 (구별)")
     for gu_name, gu_code in SEOUL_GU_CODES.items():
         try:
             count = await crawl_gu(gu_name, gu_code, all_ids)
@@ -227,15 +247,33 @@ async def run_crawl_by_gu():
     print(f"목록 수집 완료: {len(all_ids):,}개 고유 ID")
     print("=" * 70)
 
+    # 목록만 수집 모드
+    if list_only:
+        print("\n[완료] 목록만 수집 모드 - 상세 크롤링 스킵")
+        return
+
+    # 기존 공고 스킵 처리
+    skipped_count = 0
+    if skip_existing and all_ids:
+        print("\n[Phase 2] 기존 공고 필터링...")
+        existing_ids = await get_existing_job_ids()
+        original_count = len(all_ids)
+        all_ids = all_ids - existing_ids
+        skipped_count = original_count - len(all_ids)
+        print(f"  - 기존 공고: {len(existing_ids):,}건")
+        print(f"  - 스킵: {skipped_count:,}건")
+        print(f"  - 신규 크롤링 대상: {len(all_ids):,}건")
+
     # 상세 수집
     if all_ids:
-        print(f"\n상세 수집 시작: {len(all_ids):,}건")
+        phase_num = 3 if skip_existing else 2
+        print(f"\n[Phase {phase_num}] 상세 수집: {len(all_ids):,}건")
 
         scraper = JobKoreaScraperV2(
-            num_workers=10,
+            num_workers=30,
             use_proxy=True,
             fallback_to_proxy=True,
-            proxy_pool_size=10,
+            proxy_pool_size=30,
             proxy_start_pool=True,
             proxy_pool_warmup=True,
             proxy_worker_rotate_threshold=2,
@@ -247,17 +285,19 @@ async def run_crawl_by_gu():
         )
         try:
             await scraper.initialize()
-            scraper.rate_limiter.min_delay = 0.2
-            scraper.rate_limiter.delay = 0.2
+            scraper.rate_limiter.min_delay = 0.3  # 차단 방지 (보수적)
+            scraper.rate_limiter.delay = 0.5
             success, save_stats = await scraper.crawl_details(
                 all_ids,
                 save_callback=save_jobs,
                 batch_size=500,
-                parallel_batch=6,
+                parallel_batch=30,  # 10 프록시 × 3 동시요청
                 retry_limit=3,
                 retry_backoff=1.5,
-                min_parallel_batch=3,
+                min_parallel_batch=10,  # 최소 프록시당 1개
             )
+            # 통계 캡처 (close 전에)
+            crawl_stats = scraper.stats.summary()
         finally:
             await scraper.close()
 
@@ -265,12 +305,26 @@ async def run_crawl_by_gu():
         elapsed = (end_time - start_time).total_seconds()
 
         print("\n" + "=" * 70)
-        print("완료!")
-        print(f"  - 고유 ID: {len(all_ids):,}개")
+        print("크롤링 완료!")
+        print("=" * 70)
+        print(f"\n[결과]")
+        print(f"  - 목록 수집: {len(all_ids) + skipped_count:,}개")
+        if skipped_count:
+            print(f"  - 스킵 (기존): {skipped_count:,}건")
         print(f"  - 상세 성공: {success:,}건")
-        print(f"  - 신규: {save_stats.get('new', 0):,}건")
+        print(f"  - 신규 저장: {save_stats.get('new', 0):,}건")
         print(f"  - 업데이트: {save_stats.get('updated', 0):,}건")
-        print(f"  - 소요: {elapsed/60:.1f}분")
+        print(f"  - 소요: {elapsed/60:.1f}분 ({success/elapsed:.1f}건/s)")
+
+        # 차단/레이트리밋 통계
+        if crawl_stats.get("block_count") or crawl_stats.get("rate_limit_count") or crawl_stats.get("error_403_count"):
+            print(f"\n[차단 통계]")
+            if crawl_stats.get("block_count"):
+                print(f"  - 차단 감지: {crawl_stats['block_count']}회")
+            if crawl_stats.get("rate_limit_count"):
+                print(f"  - 레이트리밋 (429): {crawl_stats['rate_limit_count']}회")
+            if crawl_stats.get("error_403_count"):
+                print(f"  - 접근거부 (403): {crawl_stats['error_403_count']}회")
 
         # DB 상태
         stats_after = await get_job_stats()
@@ -281,14 +335,52 @@ async def run_crawl_by_gu():
             "started_at": start_time.isoformat(),
             "finished_at": end_time.isoformat(),
             "elapsed_seconds": int(elapsed),
-            "total_ids": len(all_ids),
+            "total_ids": len(all_ids) + skipped_count,
+            "skipped": skipped_count,
             "success": success,
             "new": save_stats.get("new", 0),
             "updated": save_stats.get("updated", 0),
-            "version": "v2-gu",
+            "version": "v2",
+            "mode": "incremental" if skip_existing else "full",
             "gu_stats": gu_stats,
+            # 차단/레이트리밋 통계
+            "block_count": crawl_stats.get("block_count", 0),
+            "rate_limit_count": crawl_stats.get("rate_limit_count", 0),
+            "error_403_count": crawl_stats.get("error_403_count", 0),
         })
+    else:
+        print("\n[완료] 크롤링할 신규 공고 없음")
+
+
+def main():
+    """CLI 진입점"""
+    parser = argparse.ArgumentParser(
+        description="JobBot 크롤러 - 서울시 전체 채용공고 수집",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+예시:
+  python run_crawler.py                 # 전체 크롤링
+  python run_crawler.py --skip-existing # 신규 공고만 (증분 크롤링)
+  python run_crawler.py --list-only     # 목록만 수집
+        """
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="DB에 있는 공고는 상세 크롤링 스킵 (증분 모드)",
+    )
+    parser.add_argument(
+        "--list-only",
+        action="store_true",
+        help="목록만 수집하고 상세 크롤링 스킵",
+    )
+
+    args = parser.parse_args()
+    asyncio.run(run_crawler(
+        skip_existing=args.skip_existing,
+        list_only=args.list_only,
+    ))
 
 
 if __name__ == "__main__":
-    asyncio.run(run_crawl_by_gu())
+    main()
