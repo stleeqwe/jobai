@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.db.firestore import get_db
 from app.config import USER_AGENTS
+from app.core.proxy_env import get_proxy_url
 
 
 DETAIL_URL = "https://www.jobkorea.co.kr/Recruit/GI_Read"
@@ -112,11 +113,6 @@ async def extract_title(client: httpx.AsyncClient, job_id: str) -> Optional[str]
         return extract_title_from_html(response.text)
     except Exception:
         return None
-
-
-def get_proxy_url() -> str:
-    """프록시 URL 생성 (IPRoyal)"""
-    return "http://wjmD9FjEss6TCmTC:PFZsSKOcUmfIb0Kj@geo.iproyal.com:12321"
 
 
 async def enrich_title(

@@ -4,7 +4,7 @@ import random
 from typing import Optional
 import httpx
 
-from app.config import USER_AGENTS
+from app.config import USER_AGENTS, settings
 from app.logging_config import get_logger
 
 logger = get_logger("crawler.session")
@@ -17,15 +17,24 @@ class SessionManager:
     JOBLIST_URL = f"{BASE_URL}/recruit/joblist"
 
     # 프록시 설정 (IPRoyal)
-    PROXY_HOST = "geo.iproyal.com"
-    PROXY_PORT = 12321
-    PROXY_USERNAME = "wjmD9FjEss6TCmTC"
-    PROXY_PASSWORD = "PFZsSKOcUmfIb0Kj"
+    PROXY_HOST = settings.PROXY_HOST
+    PROXY_PORT = settings.PROXY_PORT
+    PROXY_USERNAME = settings.PROXY_USERNAME
+    PROXY_PASSWORD = settings.PROXY_PASSWORD
 
     def __init__(self, use_proxy: bool = False):
         self.use_proxy = use_proxy
         self.client: Optional[httpx.AsyncClient] = None
         self.cookies: Optional[httpx.Cookies] = None
+        self._warned_proxy_config = False
+
+    def _proxy_configured(self) -> bool:
+        return all([
+            self.PROXY_HOST,
+            self.PROXY_PORT,
+            self.PROXY_USERNAME,
+            self.PROXY_PASSWORD,
+        ])
 
     def _get_proxy_url(self, worker_id: Optional[int] = None, lifetime: str = "10m") -> Optional[str]:
         """프록시 URL 생성
@@ -38,6 +47,11 @@ class SessionManager:
             프록시 URL 또는 None
         """
         if not self.use_proxy:
+            return None
+        if not self._proxy_configured():
+            if not self._warned_proxy_config:
+                logger.warning("프록시 설정 누락: PROXY_* 환경변수 확인 필요")
+                self._warned_proxy_config = True
             return None
 
         if worker_id is not None:

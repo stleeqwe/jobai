@@ -8,6 +8,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from app.config import settings
 from app.db.firestore import get_db
 
 
@@ -16,6 +17,10 @@ async def test_data_quality():
     print("=" * 70)
     print("E2E 테스트 4: 데이터 품질 검증")
     print("=" * 70)
+
+    if not settings.GOOGLE_CLOUD_PROJECT and not settings.GOOGLE_APPLICATION_CREDENTIALS:
+        print("[Error] GOOGLE_CLOUD_PROJECT 또는 GOOGLE_APPLICATION_CREDENTIALS 설정 필요")
+        return
 
     db = get_db()
     jobs_ref = db.collection("jobs")

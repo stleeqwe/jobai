@@ -48,16 +48,25 @@ def get_db() -> firestore.Client:
     global _db
     if _db is None:
         credentials_path = settings.GOOGLE_APPLICATION_CREDENTIALS
+        project = settings.GOOGLE_CLOUD_PROJECT or None
         if credentials_path:
             credentials = service_account.Credentials.from_service_account_file(
                 credentials_path
             )
-            _db = firestore.Client(
-                project=settings.GOOGLE_CLOUD_PROJECT,
-                credentials=credentials
-            )
+            if not project:
+                project = getattr(credentials, "project_id", None)
+            if project:
+                _db = firestore.Client(
+                    project=project,
+                    credentials=credentials
+                )
+            else:
+                _db = firestore.Client(credentials=credentials)
         else:
-            _db = firestore.Client(project=settings.GOOGLE_CLOUD_PROJECT)
+            if project:
+                _db = firestore.Client(project=project)
+            else:
+                _db = firestore.Client()
     return _db
 
 

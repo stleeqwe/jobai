@@ -40,8 +40,9 @@ async def run_full_crawl():
     print("\n[2] V2 크롤러 초기화...")
     scraper = JobKoreaScraperV2(
         num_workers=10,
-        use_proxy=False,
+        use_proxy=True,
         fallback_to_proxy=True,
+        proxy_pool_size=10,
     )
 
     try:
@@ -51,7 +52,7 @@ async def run_full_crawl():
 
         print(f"  - 서울 전체 공고: {total_count:,}건")
         print(f"  - 총 페이지: {total_pages:,}페이지")
-        print(f"  - 워커: 10개, 프록시: OFF (폴백 활성화)")
+        print(f"  - 워커: 10개, 프록시: SINGLE → POOL 폴백")
 
         # 전체 크롤링 실행
         print("\n[3] 전체 크롤링 시작...")

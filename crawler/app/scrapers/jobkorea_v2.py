@@ -63,16 +63,43 @@ class JobKoreaScraperV2:
         num_workers: int = 10,
         use_proxy: bool = False,
         fallback_to_proxy: bool = True,
+        proxy_pool_size: int = 10,
+        proxy_speed_threshold: float = 3.0,
+        proxy_delay_threshold: float = 0.3,
+        proxy_speed_consecutive: int = 2,
+        proxy_speed_warmup: int = 200,
+        proxy_start_pool: bool = False,
+        proxy_pool_warmup: bool = True,
+        proxy_worker_rotate_threshold: int = 2,
+        proxy_session_lifetime: str = "10m",
     ):
         """
         Args:
             num_workers: 병렬 워커 수 (기본 10)
             use_proxy: 처음부터 프록시 사용 (기본 False)
             fallback_to_proxy: 차단 시 프록시로 폴백 (기본 True)
+            proxy_pool_size: 풀 프록시 워커 수 (기본 10)
+            proxy_speed_threshold: 풀 전환 속도 임계값 (기본 3.0건/s)
+            proxy_delay_threshold: 레이트리밋 딜레이 임계값 (기본 0.3s)
+            proxy_speed_consecutive: 연속 조건 만족 횟수 (기본 2회)
+            proxy_speed_warmup: 전환 판단 시작 건수 (기본 200건)
+            proxy_start_pool: 시작 시 풀 모드 사용 여부 (기본 False)
+            proxy_pool_warmup: 풀 워커 쿠키 워밍업 여부 (기본 True)
+            proxy_worker_rotate_threshold: 풀 워커 세션 교체 임계값 (기본 2)
+            proxy_session_lifetime: Sticky 세션 유지 시간 (기본 10분)
         """
         self.num_workers = num_workers
         self.use_proxy = use_proxy
         self.fallback_to_proxy = fallback_to_proxy
+        self.proxy_pool_size = proxy_pool_size
+        self.proxy_speed_threshold = proxy_speed_threshold
+        self.proxy_delay_threshold = proxy_delay_threshold
+        self.proxy_speed_consecutive = proxy_speed_consecutive
+        self.proxy_speed_warmup = proxy_speed_warmup
+        self.proxy_start_pool = proxy_start_pool
+        self.proxy_pool_warmup = proxy_pool_warmup
+        self.proxy_worker_rotate_threshold = proxy_worker_rotate_threshold
+        self.proxy_session_lifetime = proxy_session_lifetime
 
         self.session_manager = SessionManager(use_proxy=use_proxy)
         self.proxy_session: Optional[ProxySessionManager] = None
@@ -89,8 +116,15 @@ class JobKoreaScraperV2:
         # 상태
         self.total_count = 0
         self.total_pages = 0
-        self.proxy_enabled = False
+        if use_proxy:
+            self.proxy_mode = "pool" if proxy_start_pool else "single"
+        else:
+            self.proxy_mode = "none"
+        self.proxy_enabled = self.proxy_mode != "none"
         self.block_count = 0
+        self._slow_speed_count = 0
+        self.proxy_worker_failures: List[int] = []
+        self.proxy_worker_sessions: List[str] = []
 
     async def initialize(self):
         """크롤러 초기화"""
@@ -112,6 +146,41 @@ class JobKoreaScraperV2:
 
         logger.info(f"초기화 완료: {self.num_workers}개 워커, 프록시 {'ON' if self.use_proxy else 'OFF'}")
 
+    def _copy_cookies(self, cookies: Optional[httpx.Cookies]) -> httpx.Cookies:
+        new_cookies = httpx.Cookies()
+        if cookies:
+            new_cookies.update(cookies)
+        return new_cookies
+
+    def _make_proxy_session_id(self, worker_idx: int) -> str:
+        """8자 세션 ID 생성 (IPRoyal 권장 규칙)"""
+        suffix = random.randint(0, 99999)
+        return f"w{worker_idx:02d}{suffix:05d}"
+
+    async def _fetch_proxy_cookies(self, proxy_url: str, worker_idx: int) -> httpx.Cookies:
+        """프록시 경유로 세션 쿠키 워밍업"""
+        client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={
+                "User-Agent": USER_AGENTS[worker_idx % len(USER_AGENTS)],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ko-KR,ko;q=0.9",
+            },
+            follow_redirects=True,
+            proxy=proxy_url,
+        )
+        try:
+            resp = await client.get(
+                self.session_manager.JOBLIST_URL,
+                params={"menucode": "local", "local": "I000"},
+            )
+            if resp.status_code != 200:
+                logger.warning("프록시 쿠키 워밍업 실패: 워커 %d, 상태 %s", worker_idx, resp.status_code)
+        finally:
+            cookies = self._copy_cookies(client.cookies)
+            await client.aclose()
+        return cookies
+
     async def _create_worker_pool(self, cookies: httpx.Cookies):
         """워커 클라이언트 풀 생성"""
         # 기존 클라이언트 정리
@@ -119,11 +188,45 @@ class JobKoreaScraperV2:
             await client.aclose()
         self.clients = []
 
-        proxy_url = None
-        if self.proxy_enabled or self.use_proxy:
-            proxy_url = f"http://{SessionManager.PROXY_USERNAME}:{SessionManager.PROXY_PASSWORD}@{SessionManager.PROXY_HOST}:{SessionManager.PROXY_PORT}"
+        proxy_mode = self.proxy_mode
+        if proxy_mode != "none" and not self.session_manager._proxy_configured():
+            logger.warning("프록시 설정 누락: PROXY_* 환경변수 확인 필요")
+            proxy_mode = "none"
+            self.proxy_mode = "none"
+            self.proxy_enabled = False
+        self.proxy_worker_failures = [0] * self.num_workers
+        self.proxy_worker_sessions = []
+        worker_cookies: List[httpx.Cookies] = []
+
+        if proxy_mode == "pool":
+            self.proxy_worker_sessions = [
+                self._make_proxy_session_id(i) for i in range(self.num_workers)
+            ]
+
+            if self.proxy_pool_warmup:
+                for i, session_id in enumerate(self.proxy_worker_sessions):
+                    proxy_url = self._build_proxy_url(session_id)
+                    if not proxy_url:
+                        worker_cookies.append(self._copy_cookies(cookies))
+                        continue
+                    try:
+                        warmed = await self._fetch_proxy_cookies(proxy_url, i)
+                        worker_cookies.append(warmed)
+                    except Exception as e:
+                        logger.warning("워커 %d 쿠키 워밍업 실패: %s", i, e)
+                        worker_cookies.append(self._copy_cookies(cookies))
+            else:
+                worker_cookies = [self._copy_cookies(cookies) for _ in range(self.num_workers)]
 
         for i in range(self.num_workers):
+            proxy_url = None
+            client_cookies = cookies
+            if proxy_mode == "single":
+                proxy_url = self._build_proxy_url("single")
+            elif proxy_mode == "pool":
+                proxy_url = self._build_proxy_url(self.proxy_worker_sessions[i])
+                if worker_cookies:
+                    client_cookies = worker_cookies[i]
             client = httpx.AsyncClient(
                 timeout=30.0,
                 headers={
@@ -131,26 +234,140 @@ class JobKoreaScraperV2:
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Accept-Language": "ko-KR,ko;q=0.9",
                 },
-                cookies=cookies,
+                cookies=client_cookies,
                 follow_redirects=True,
                 proxy=proxy_url,
             )
             self.clients.append(client)
 
-    async def _switch_to_proxy(self):
-        """프록시 모드로 전환"""
-        if self.proxy_enabled:
+    def _build_proxy_url(self, session_id: Optional[str] = None) -> Optional[str]:
+        """프록시 URL 생성 (세션 고정 옵션 포함)"""
+        if not self.session_manager._proxy_configured():
+            return None
+
+        if session_id:
+            return (
+                f"http://{SessionManager.PROXY_USERNAME}:{SessionManager.PROXY_PASSWORD}"
+                f"_session-{session_id}_lifetime-{self.proxy_session_lifetime}"
+                f"@{SessionManager.PROXY_HOST}:{SessionManager.PROXY_PORT}"
+            )
+        return (
+            f"http://{SessionManager.PROXY_USERNAME}:{SessionManager.PROXY_PASSWORD}"
+            f"@{SessionManager.PROXY_HOST}:{SessionManager.PROXY_PORT}"
+        )
+
+    async def _rotate_proxy_worker(self, worker_idx: int, reason: str):
+        """풀 모드에서 워커 프록시 세션 교체"""
+        if self.proxy_mode != "pool":
+            return
+        if worker_idx >= len(self.clients):
             return
 
-        logger.warning("차단 감지! 프록시 모드로 전환 중...")
+        session_id = self._make_proxy_session_id(worker_idx)
+        proxy_url = self._build_proxy_url(session_id)
+        if not proxy_url:
+            logger.warning("워커 %d 프록시 교체 실패: 프록시 설정 누락", worker_idx)
+            return
+
+        cookies = None
+        if self.proxy_pool_warmup:
+            try:
+                cookies = await self._fetch_proxy_cookies(proxy_url, worker_idx)
+            except Exception as e:
+                logger.warning("워커 %d 쿠키 워밍업 실패: %s", worker_idx, e)
+
+        if cookies is None:
+            cookies = self._copy_cookies(self.session_manager.get_cookies())
+
+        client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={
+                "User-Agent": USER_AGENTS[worker_idx % len(USER_AGENTS)],
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ko-KR,ko;q=0.9",
+            },
+            cookies=cookies,
+            follow_redirects=True,
+            proxy=proxy_url,
+        )
+
+        old_client = self.clients[worker_idx]
+        self.clients[worker_idx] = client
+        await old_client.aclose()
+
+        if worker_idx < len(self.proxy_worker_sessions):
+            self.proxy_worker_sessions[worker_idx] = session_id
+        if worker_idx < len(self.proxy_worker_failures):
+            self.proxy_worker_failures[worker_idx] = 0
+
+        logger.info("워커 %d 프록시 세션 교체 완료 (%s)", worker_idx, reason)
+
+    async def _handle_proxy_worker_failure(self, worker_idx: int, reason: str):
+        """풀 모드 워커 실패 누적 처리"""
+        if self.proxy_mode != "pool":
+            return
+        if worker_idx >= len(self.proxy_worker_failures):
+            return
+
+        self.proxy_worker_failures[worker_idx] += 1
+        if self.proxy_worker_failures[worker_idx] >= self.proxy_worker_rotate_threshold:
+            await self._rotate_proxy_worker(worker_idx, reason)
+
+    async def _switch_to_proxy(self):
+        """프록시 모드로 전환"""
+        await self._switch_to_proxy_pool("차단 감지")
+
+    async def _switch_to_proxy_pool(self, reason: str):
+        """풀 프록시 모드로 전환"""
+        if self.proxy_mode == "pool":
+            return
+
+        if not self.session_manager._proxy_configured():
+            logger.warning("프록시 설정 누락으로 전환 생략")
+            self.proxy_mode = "none"
+            self.proxy_enabled = False
+            return
+
+        logger.warning("%s: 프록시 풀(%d) 모드로 전환 중...", reason, self.proxy_pool_size)
+        self.proxy_mode = "pool"
         self.proxy_enabled = True
         self.stats.proxy_switched = True
+
+        if self.proxy_pool_size > 0:
+            self.num_workers = self.proxy_pool_size
 
         cookies = self.session_manager.get_cookies()
         await self._create_worker_pool(cookies)
 
         self.rate_limiter.reset()
-        logger.info("프록시 모드 전환 완료")
+        self.block_count = 0
+        self._slow_speed_count = 0
+        logger.info("프록시 풀 모드 전환 완료")
+
+    async def _maybe_switch_to_proxy_pool(self, window_speed: float, processed: int):
+        """속도/레이트리밋 기준으로 풀 프록시 전환 판단"""
+        if self.proxy_mode != "single":
+            return
+        if self.proxy_pool_size <= 1:
+            return
+        if processed < self.proxy_speed_warmup:
+            return
+        if window_speed <= 0:
+            return
+
+        rate_limited = (
+            self.rate_limiter.get_delay() >= self.proxy_delay_threshold
+            or self.rate_limiter.is_blocked()
+            or self.block_count >= 1
+        )
+
+        if window_speed < self.proxy_speed_threshold and rate_limited:
+            self._slow_speed_count += 1
+        else:
+            self._slow_speed_count = 0
+
+        if self._slow_speed_count >= self.proxy_speed_consecutive:
+            await self._switch_to_proxy_pool(f"속도 저하 {window_speed:.1f}건/s")
 
     # ========== 목록 수집 ==========
 
@@ -227,6 +444,9 @@ class JobKoreaScraperV2:
         save_callback: Optional[Callable[[List[Dict]], Awaitable[dict]]] = None,
         batch_size: int = 500,
         parallel_batch: int = 10,
+        retry_limit: int = 2,
+        retry_backoff: float = 1.5,
+        min_parallel_batch: int = 3,
     ) -> Tuple[int, Dict]:
         """
         상세 페이지 크롤링
@@ -236,6 +456,9 @@ class JobKoreaScraperV2:
             save_callback: 저장 콜백
             batch_size: 저장 배치 크기
             parallel_batch: 동시 요청 수
+            retry_limit: 실패 재시도 횟수 (기본 2)
+            retry_backoff: 재시도 라운드 딜레이 배수 (기본 1.5)
+            min_parallel_batch: 재시도 시 최소 동시 요청 수 (기본 3)
 
         Returns:
             (성공 건수, 저장 통계)
@@ -243,53 +466,93 @@ class JobKoreaScraperV2:
         logger.info(f"상세 수집 시작: {len(job_ids):,}건")
         print(f"[V2] 상세 수집 시작: {len(job_ids):,}건", flush=True)
 
+        total = len(job_ids)
+        current_parallel = min(parallel_batch, self.num_workers)
+        min_parallel = min(current_parallel, min_parallel_batch)
+
         id_list = list(job_ids)
+        attempts: Dict[str, int] = {job_id: 0 for job_id in id_list}
+        pending_ids: List[str] = id_list
         total_saved = {"new": 0, "updated": 0, "failed": 0}
         pending_jobs: List[Dict] = []
 
         # 진행 상황
-        processed = 0
+        completed = 0
         start_time = time.time()
+        last_check_time = start_time
+        last_completed = 0
+        retry_round = 0
 
-        for batch_start in range(0, len(id_list), parallel_batch):
-            batch_ids = id_list[batch_start:batch_start + parallel_batch]
+        while pending_ids:
+            retry_queue: List[str] = []
 
-            # 병렬로 상세 페이지 수집
-            tasks = [
-                self._fetch_detail_with_fallback(job_id, i % self.num_workers)
-                for i, job_id in enumerate(batch_ids)
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for batch_start in range(0, len(pending_ids), current_parallel):
+                batch_ids = pending_ids[batch_start:batch_start + current_parallel]
 
-            for result in results:
-                if isinstance(result, dict) and result:
-                    pending_jobs.append(result)
-                    self.stats.detail_success += 1
-                else:
-                    self.stats.detail_failed += 1
+                # 병렬로 상세 페이지 수집
+                tasks = [
+                    self._fetch_detail_with_fallback(job_id, i % self.num_workers)
+                    for i, job_id in enumerate(batch_ids)
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            processed += len(batch_ids)
+                for job_id, result in zip(batch_ids, results):
+                    if isinstance(result, dict) and result:
+                        pending_jobs.append(result)
+                        self.stats.detail_success += 1
+                        completed += 1
+                    else:
+                        attempts[job_id] += 1
+                        if attempts[job_id] <= retry_limit:
+                            retry_queue.append(job_id)
+                        else:
+                            self.stats.detail_failed += 1
+                            total_saved["failed"] += 1
+                            completed += 1
 
-            # 진행 상황 출력
-            if processed % 100 == 0 or processed == len(id_list):
-                elapsed = time.time() - start_time
-                speed = processed / elapsed if elapsed > 0 else 0
-                eta = (len(id_list) - processed) / speed if speed > 0 else 0
-                print(f"[V2] 진행: {processed}/{len(id_list)} ({speed:.1f}건/s, ETA: {eta/60:.1f}분)", flush=True)
+                # 진행 상황 출력
+                if completed % 100 == 0 or completed == total:
+                    now = time.time()
+                    elapsed = now - start_time
+                    speed = completed / elapsed if elapsed > 0 else 0
+                    eta = (total - completed) / speed if speed > 0 else 0
+                    print(f"[V2] 진행: {completed}/{total} ({speed:.1f}건/s, ETA: {eta/60:.1f}분)", flush=True)
 
-            # 배치 저장
-            if len(pending_jobs) >= batch_size and save_callback:
-                try:
-                    result = await save_callback(pending_jobs)
-                    total_saved["new"] += result.get("new", 0)
-                    total_saved["updated"] += result.get("updated", 0)
-                    print(f"[V2] 저장: {len(pending_jobs)}건", flush=True)
-                    pending_jobs = []
-                except Exception as e:
-                    logger.error(f"저장 실패: {e}")
+                    window_completed = completed - last_completed
+                    window_elapsed = now - last_check_time
+                    window_speed = window_completed / window_elapsed if window_elapsed > 0 else 0
+                    last_completed = completed
+                    last_check_time = now
 
-            # 속도 조절
-            await asyncio.sleep(self.rate_limiter.get_delay())
+                    await self._maybe_switch_to_proxy_pool(window_speed, completed)
+
+                # 배치 저장
+                if len(pending_jobs) >= batch_size and save_callback:
+                    try:
+                        result = await save_callback(pending_jobs)
+                        total_saved["new"] += result.get("new", 0)
+                        total_saved["updated"] += result.get("updated", 0)
+                        print(f"[V2] 저장: {len(pending_jobs)}건", flush=True)
+                        pending_jobs = []
+                    except Exception as e:
+                        logger.error(f"저장 실패: {e}")
+
+                # 속도 조절
+                await asyncio.sleep(self.rate_limiter.get_delay())
+
+            if retry_queue:
+                retry_round += 1
+                current_parallel = max(min_parallel, current_parallel - 1)
+                new_delay = min(self.rate_limiter.max_delay, self.rate_limiter.delay * retry_backoff)
+                self.rate_limiter.delay = new_delay
+                self.rate_limiter.min_delay = max(self.rate_limiter.min_delay, new_delay)
+                print(
+                    f"[V2] 재시도 라운드 {retry_round}: {len(retry_queue)}건, "
+                    f"parallel={current_parallel}, delay={self.rate_limiter.delay:.2f}s",
+                    flush=True,
+                )
+
+            pending_ids = retry_queue
 
         # 남은 데이터 저장
         if pending_jobs and save_callback:
@@ -313,22 +576,58 @@ class JobKoreaScraperV2:
             if result:
                 self.rate_limiter.on_success()
                 self.block_count = 0
+                if self.proxy_mode == "pool" and worker_idx < len(self.proxy_worker_failures):
+                    self.proxy_worker_failures[worker_idx] = 0
                 return result
 
+        except BlockedError as e:
+            self.block_count += 1
+            self.rate_limiter.on_error(429)
+            logger.debug("상세 수집 차단 감지 (%s): %s", job_id, e)
+
+            if self.proxy_mode == "pool":
+                await self._handle_proxy_worker_failure(worker_idx, "차단 감지")
+
+            if self.block_count >= 5 and self.fallback_to_proxy and self.proxy_mode != "pool":
+                await self._switch_to_proxy()
+                client = self.clients[worker_idx]
+                return await self._fetch_detail_info(client, job_id)
+
         except httpx.HTTPStatusError as e:
-            if e.response.status_code in [403, 429]:
+            status_code = e.response.status_code if e.response else None
+            if status_code in [403, 429]:
                 self.block_count += 1
-                self.rate_limiter.on_error(e.response.status_code)
+                self.rate_limiter.on_error(status_code)
+
+                if self.proxy_mode == "pool":
+                    await self._handle_proxy_worker_failure(worker_idx, f"HTTP {status_code}")
 
                 # 차단 감지 → 프록시 전환
-                if self.block_count >= 5 and self.fallback_to_proxy and not self.proxy_enabled:
+                if self.block_count >= 5 and self.fallback_to_proxy and self.proxy_mode != "pool":
                     await self._switch_to_proxy()
                     # 프록시로 재시도
                     client = self.clients[worker_idx]
                     return await self._fetch_detail_info(client, job_id)
+            else:
+                logger.debug("상세 수집 실패 (%s): HTTP %s", job_id, status_code)
+
+        except httpx.TransportError as e:
+            if self.proxy_mode == "pool":
+                await self._handle_proxy_worker_failure(worker_idx, type(e).__name__)
+            logger.debug(
+                "상세 수집 네트워크 실패 (%s): %s %s",
+                job_id,
+                type(e).__name__,
+                e,
+            )
 
         except Exception as e:
-            logger.debug(f"상세 수집 실패 ({job_id}): {e}")
+            logger.debug(
+                "상세 수집 실패 (%s): %s %s",
+                job_id,
+                type(e).__name__,
+                e,
+            )
 
         return None
 
@@ -346,12 +645,29 @@ class JobKoreaScraperV2:
                 raise BlockedError("차단 감지")
 
             # 파싱
-            return self._parse_detail_page(job_id, html)
+            try:
+                return self._parse_detail_page(job_id, html)
+            except Exception as e:
+                logger.debug(
+                    "상세 파싱 실패 (%s): %s %s (len=%s)",
+                    job_id,
+                    type(e).__name__,
+                    e,
+                    len(html),
+                )
+                return None
 
         except httpx.HTTPStatusError:
             raise
+        except BlockedError:
+            raise
         except Exception as e:
-            logger.debug(f"상세 파싱 실패 ({job_id}): {e}")
+            logger.debug(
+                "상세 수집 실패 (%s): %s %s",
+                job_id,
+                type(e).__name__,
+                e,
+            )
             return None
 
     def _detect_blocking(self, response: httpx.Response) -> bool:

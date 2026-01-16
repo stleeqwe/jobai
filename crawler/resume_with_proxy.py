@@ -15,7 +15,7 @@ from typing import Set
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.scrapers.jobkorea_v2 import JobKoreaScraperV2
-from app.core.session_manager import SessionManager
+from app.core.proxy_env import get_proxy_url
 from app.db.firestore import save_jobs, get_job_stats
 from app.logging_config import get_logger
 from app.config import USER_AGENTS
@@ -38,11 +38,6 @@ SEOUL_GU_CODES = {
 class ProxyWorkerPool:
     """10개 고정 IP 프록시 워커 풀"""
 
-    PROXY_HOST = "geo.iproyal.com"
-    PROXY_PORT = 12321
-    PROXY_USERNAME = "wjmD9FjEss6TCmTC"
-    PROXY_PASSWORD = "PFZsSKOcUmfIb0Kj"
-
     def __init__(self, num_workers: int = 10):
         self.num_workers = num_workers
         self.clients: list[httpx.AsyncClient] = []
@@ -51,11 +46,7 @@ class ProxyWorkerPool:
     def _get_proxy_url(self, worker_id: int) -> str:
         """워커별 Sticky 세션 프록시 URL"""
         session_id = f"worker{worker_id:02d}"
-        return (
-            f"http://{self.PROXY_USERNAME}:{self.PROXY_PASSWORD}"
-            f"_session-{session_id}_lifetime-30m"
-            f"@{self.PROXY_HOST}:{self.PROXY_PORT}"
-        )
+        return get_proxy_url(session_id=session_id, lifetime="30m")
 
     async def initialize(self):
         """10개 워커 초기화 (각각 다른 IP)"""

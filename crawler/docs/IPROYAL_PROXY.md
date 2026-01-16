@@ -54,15 +54,15 @@ username:password_session-{SESSION_ID}_lifetime-{DURATION}@geo.iproyal.com:12321
 
 ## 3. 프로젝트 적용
 
-### 3.1 현재 설정
+### 3.1 환경변수 설정
 
-**파일:** `crawler/app/core/session_manager.py`
+**파일:** `.env`
 
-```python
-PROXY_HOST = "geo.iproyal.com"
-PROXY_PORT = 12321
-PROXY_USERNAME = "wjmD9FjEss6TCmTC"
-PROXY_PASSWORD = "PFZsSKOcUmfIb0Kj"
+```bash
+PROXY_HOST=geo.iproyal.com
+PROXY_PORT=12321
+PROXY_USERNAME=your-username
+PROXY_PASSWORD=your-password
 ```
 
 ### 3.2 워커별 세션 분리

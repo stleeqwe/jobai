@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     MAX_PAGES: int = 100
     BATCH_SIZE: int = 100
 
+    # Proxy Settings (IPRoyal)
+    PROXY_HOST: str = ""
+    PROXY_PORT: int = 0
+    PROXY_USERNAME: str = ""
+    PROXY_PASSWORD: str = ""
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

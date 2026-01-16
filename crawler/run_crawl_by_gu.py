@@ -13,6 +13,7 @@ from typing import Set, Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.scrapers.jobkorea_v2 import JobKoreaScraperV2
+from app.core.ajax_client import AdaptiveRateLimiter
 from app.db.firestore import save_jobs, get_job_stats, save_crawl_log
 from app.logging_config import get_logger
 
@@ -144,6 +145,10 @@ async def crawl_list_with_params(scraper: JobKoreaScraperV2, params: Dict, max_p
     """파라미터로 목록 수집 (local, jobtype, career 등)"""
     import re
     collected_ids: Set[str] = set()
+    rate_limiter = AdaptiveRateLimiter()
+    no_new_pages = 0
+    repeat_pages = 0
+    last_page_ids: Optional[Set[str]] = None
 
     for page in range(1, max_pages + 1):
         try:
@@ -155,16 +160,38 @@ async def crawl_list_with_params(scraper: JobKoreaScraperV2, params: Dict, max_p
             )
 
             if resp.status_code == 200:
-                matches = re.findall(r'GI_Read/(\d+)', resp.text)
-                collected_ids.update(matches)
+                page_ids = set(re.findall(r'GI_Read/(\d+)', resp.text))
+                new_ids = page_ids - collected_ids
+                collected_ids.update(page_ids)
+
+                if not new_ids:
+                    no_new_pages += 1
+                else:
+                    no_new_pages = 0
+
+                if last_page_ids is not None and page_ids == last_page_ids:
+                    repeat_pages += 1
+                else:
+                    repeat_pages = 0
+                last_page_ids = page_ids
+
+                if repeat_pages >= 2 or no_new_pages >= 3:
+                    logger.warning(f"중복 페이지 감지로 조기 종료: 페이지 {page}")
+                    break
+
+                rate_limiter.on_success()
+            else:
+                logger.warning(f"AJAX 호출 실패: 페이지 {page}, 상태 {resp.status_code}")
+                rate_limiter.on_error(resp.status_code)
 
             if page % 50 == 0:
                 print(f"    페이지 {page}/{max_pages}: 누적 {len(collected_ids)}개")
 
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(rate_limiter.get_delay())
 
         except Exception as e:
             logger.warning(f"페이지 {page} 실패: {e}")
+            await asyncio.sleep(rate_limiter.get_delay())
 
     return collected_ids
 
@@ -204,13 +231,32 @@ async def run_crawl_by_gu():
     if all_ids:
         print(f"\n상세 수집 시작: {len(all_ids):,}건")
 
-        scraper = JobKoreaScraperV2(num_workers=10, use_proxy=False, fallback_to_proxy=True)
+        scraper = JobKoreaScraperV2(
+            num_workers=10,
+            use_proxy=True,
+            fallback_to_proxy=True,
+            proxy_pool_size=10,
+            proxy_start_pool=True,
+            proxy_pool_warmup=True,
+            proxy_worker_rotate_threshold=2,
+            proxy_session_lifetime="30m",
+            proxy_speed_threshold=2.0,
+            proxy_delay_threshold=1.0,
+            proxy_speed_consecutive=3,
+            proxy_speed_warmup=500,
+        )
         try:
             await scraper.initialize()
+            scraper.rate_limiter.min_delay = 0.2
+            scraper.rate_limiter.delay = 0.2
             success, save_stats = await scraper.crawl_details(
                 all_ids,
                 save_callback=save_jobs,
                 batch_size=500,
+                parallel_batch=6,
+                retry_limit=3,
+                retry_backoff=1.5,
+                min_parallel_batch=3,
             )
         finally:
             await scraper.close()

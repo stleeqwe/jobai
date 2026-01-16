@@ -26,7 +26,12 @@ async def run_crawl_500():
     print(f"\n[DB] 현재: {stats_before['total_jobs']:,}건, 활성: {stats_before['active_jobs']:,}건")
 
     # 크롤러
-    scraper = JobKoreaScraperV2(num_workers=10, use_proxy=False, fallback_to_proxy=True)
+    scraper = JobKoreaScraperV2(
+        num_workers=10,
+        use_proxy=True,
+        fallback_to_proxy=True,
+        proxy_pool_size=10,
+    )
 
     try:
         await scraper.initialize()
