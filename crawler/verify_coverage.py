@@ -81,8 +81,9 @@ async def get_jobkorea_ids() -> Set[str]:
                     if resp.status_code != 200:
                         break
 
-                    # ID 추출 (data-gno 속성)
-                    ids = set(re.findall(r'data-gno="(\d+)"', resp.text))
+                    # ID 추출 (data-gno 속성, 8자리만 유효)
+                    raw_ids = re.findall(r'data-gno="(\d+)"', resp.text)
+                    ids = set(i for i in raw_ids if len(i) == 8)
 
                     if not ids:
                         break
