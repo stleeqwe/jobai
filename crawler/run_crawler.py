@@ -170,7 +170,8 @@ async def crawl_list_with_params(scraper: JobKoreaScraperV2, params: Dict, max_p
             )
 
             if resp.status_code == 200:
-                page_ids = set(re.findall(r'GI_Read/(\d+)', resp.text))
+                raw_ids = re.findall(r'GI_Read/(\d+)', resp.text)
+                page_ids = set(id for id in raw_ids if len(id) == 8)  # 8자리만 유효
                 new_ids = page_ids - collected_ids
                 collected_ids.update(page_ids)
 
