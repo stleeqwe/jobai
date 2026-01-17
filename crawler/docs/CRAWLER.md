@@ -1,7 +1,7 @@
 # 잡코리아 크롤러 V2
 
-> **최종 업데이트**: 2026-01-16
-> **버전**: 2.2 (Refactored)
+> **최종 업데이트**: 2026-01-17
+> **버전**: 2.3 (Skills 추출 추가)
 
 ---
 
@@ -230,43 +230,112 @@ username:password_session-{8자}_lifetime-{시간}@geo.iproyal.com:12321
 
 ---
 
-## 6. 제목 토큰 추출
+## 6. 키워드 추출 (job_keywords)
+
+### 개요
+
+`job_keywords` 필드는 검색 매칭에 사용되는 키워드 목록입니다.
+
+**구성 요소 (우선순위순)**:
+1. **skills**: HARD_SKILL 타입 기술 스택 (예: Python, React, AWS)
+2. **work_fields**: 잡코리아 직무 분류 (예: 백엔드개발, 마케팅)
+3. **title_tokens**: 제목에서 추출한 토큰 (불용어 제외)
 
 ### 구현 내용
 
 ```python
-# app/parsers/detail_parser.py - DetailPageParser._build_keywords()
+# app/parsers/detail_parser.py
 
-# 모듈 레벨에서 정규식 컴파일 (성능 최적화)
+# 기술 스택 추출 패턴 (HARD_SKILL 타입)
 _PATTERNS = {
+    "skills": re.compile(
+        r'\\?"name\\?":\\?"([^"\\]+)\\?",'
+        r'\\?"rank\\?":\d+,'
+        r'\\?"manualInput\\?":(true|false),'
+        r'\\?"skillTypeCode\\?":\\?"HARD_SKILL\\?"'
+    ),
     "whitespace": re.compile(r'\s+'),
     "non_alphanumeric": re.compile(r'[^0-9a-zA-Z가-힣+#]'),
 }
 
-_STOPWORDS = frozenset({
-    "채용", "모집", "신입", "경력", "정규직", "계약직",
-    "급구", "우대", "담당", "업무", "직원", "구인", ...
-})
+def _parse_skills(self, html: str) -> List[str]:
+    """기술 스택 추출 (HARD_SKILL 타입)"""
+    matches = _PATTERNS["skills"].findall(html)
+    skills = []
+    seen = set()
+    for match in matches:
+        skill_name = match[0].strip()
+        if skill_name and skill_name.lower() not in seen:
+            skills.append(skill_name)
+            seen.add(skill_name.lower())
+    return skills
 
-def _build_keywords(self, work_fields: List[str], title: str) -> List[str]:
-    # 제목에서 토큰 추출
-    title_tokens = []
-    for raw_token in _PATTERNS["whitespace"].split(title):
-        token = _PATTERNS["non_alphanumeric"].sub("", raw_token)
-        if len(token) >= 2 and token.lower() not in _STOPWORDS:
-            title_tokens.append(token)
+def _build_keywords(self, work_fields: List[str], title: str, skills: List[str] = None) -> List[str]:
+    """job_keywords 생성 (skills + work_fields + 제목 토큰)
 
-    # work_fields + title_tokens 병합 (중복 제거)
-    return list(dict.fromkeys(work_fields + title_tokens))[:7]
+    우선순위: skills(기술스택) > work_fields(직무분류) > title(제목토큰)
+    갯수 제한 없음 (검색 정확도를 위해)
+    """
+    # 제목에서 토큰 추출 (불용어 제외)
+    title_tokens = [...]
+
+    # skills + work_fields + title_tokens 병합 (중복 제거, skills 우선)
+    job_keywords = []
+    seen = set()
+
+    for skill in (skills or []):
+        if skill.lower() not in seen:
+            job_keywords.append(skill)
+            seen.add(skill.lower())
+
+    for keyword in work_fields + title_tokens:
+        if keyword.lower() not in seen:
+            job_keywords.append(keyword)
+            seen.add(keyword.lower())
+
+    return job_keywords  # 갯수 제한 없음
 ```
 
 ### 예시
 
-| 제목 | 추출 키워드 |
-|------|-------------|
-| "[강남] JAVA 백엔드 개발자 채용" | JAVA, 백엔드, 개발자 |
-| "마케팅 담당자 모집 (경력)" | 마케팅 |
-| "React/Vue 프론트엔드 개발" | React, Vue, 프론트엔드, 개발 |
+| 제목 | skills | work_fields | 최종 job_keywords |
+|------|--------|-------------|-------------------|
+| "JAVA 백엔드 개발자" | [Java, Spring] | [백엔드개발] | [Java, Spring, 백엔드개발, JAVA, 백엔드, 개발자] |
+| "마케팅 담당자 모집" | [Excel, PPT] | [마케팅] | [Excel, PPT, 마케팅] |
+| "React 프론트엔드" | [React, TypeScript] | [프론트엔드] | [React, TypeScript, 프론트엔드] |
+
+### 검색 매칭 가중치
+
+백엔드 검색 시 매칭 우선순위 (`backend/app/utils/keyword_matcher.py`):
+
+| 필드 | 가중치 | 설명 |
+|------|--------|------|
+| title | 3점 | 제목에 검색어 포함 |
+| job_type_raw | 2점 | 직무 분류에 포함 |
+| job_keywords | 1점 | 키워드 배열에 포함 |
+
+총점 합산 후 내림차순 정렬로 검색 결과 반환.
+
+### 테스트 결과 (2026-01-17)
+
+**테스트 방법**: 샘플 공고 3건 크롤링 → 파싱 → DB 저장 → 검색 매칭 확인
+
+#### 파싱 결과
+
+| 공고 ID | 제목 | skills 추출 | job_keywords |
+|---------|------|-------------|--------------|
+| 48432958 | [GFC사업부] 기업재무상담... | Excel, PowerPoint, word | [Excel, PowerPoint, word, 부산지역 금융채용관...] |
+| 48432957 | 물리치료사 선생님 모십니다 | (없음) | [물리치료, 물리치료사, 선생님, ...] |
+| 48432944 | 아르바이트 / 피부관리사... | (없음) | [피부관리사, 아르바이트, 1년이상, ...] |
+
+#### 검증 결과
+
+| 항목 | 결과 |
+|------|------|
+| skills 추출 | ✅ HARD_SKILL 타입 정상 추출 |
+| job_keywords 순서 | ✅ skills → work_fields → title 순서 유지 |
+| DB 저장 | ✅ 3건 저장 성공 (`new: 3`) |
+| 검색 매칭 | ✅ job_keywords 매칭 시 스코어 +1점 |
 
 ---
 
@@ -501,6 +570,7 @@ python run_crawler.py
 
 | 날짜 | 버전 | 내용 |
 |------|------|------|
+| 2026-01-17 | 2.3 | **skills 추출 추가**: HARD_SKILL 타입 기술 스택 추출, job_keywords에 skills 우선 포함, 갯수 제한 제거 |
 | 2026-01-16 | 2.2 | **대규모 리팩토링**: 파서 분리 (`DetailPageParser`), 워커 분리 (`DetailCrawlOrchestrator`), 상수 중앙화 (`CrawlerConfig`), 예외 표준화 (`exceptions.py`), 테스트 구조화 |
 | 2026-01-16 | 2.1 | **서울 전체 51,000건 수집 완료** (구별 분할 + 중복 제거) |
 | 2026-01-16 | 2.1 | 워커 수 확대 (10 → 30), 프록시 풀 30개 |

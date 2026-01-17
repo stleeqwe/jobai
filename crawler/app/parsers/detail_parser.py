@@ -74,6 +74,9 @@ _PATTERNS = {
         (re.compile(r'상시\s*채용|상시채용', re.IGNORECASE), "ongoing"),
         (re.compile(r'채용\s*시\s*마감|채용시까지', re.IGNORECASE), "until_hired"),
     ],
+
+    # 기술 스택 추출 (HARD_SKILL 타입)
+    "skills": re.compile(r'\\?"name\\?":\\?"([^"\\]+)\\?",\\?"rank\\?":\d+,\\?"manualInput\\?":(true|false),\\?"skillTypeCode\\?":\\?"HARD_SKILL\\?"'),
 }
 
 # 제목 필터링용 불용어
@@ -124,11 +127,12 @@ class DetailPageParser:
         title = self._parse_title(html, soup)
         company_name = self._parse_company_name(html, soup)
         work_fields = self._parse_work_fields(html)
+        skills = self._parse_skills(html)
         salary_data = self._parse_salary(html)
         company_address = self._parse_address(html)
         company_size = self._parse_company_size(html)
         employment_type = self._parse_employment_type(html)
-        job_keywords = self._build_keywords(work_fields, title)
+        job_keywords = self._build_keywords(work_fields, title, skills)
         deadline_info = self._parse_deadline(html)
 
         # 정규화 처리
@@ -154,7 +158,7 @@ class DetailPageParser:
             "job_type_raw": ", ".join(work_fields[:3]),
             "job_category": category,
             "mvp_category": mvp_category,
-            "job_keywords": job_keywords[:7],
+            "job_keywords": job_keywords,  # skills + workFields + title 전부 포함
             "location_sido": location_info.get("sido", "서울"),
             "location_gugun": location_info.get("gugun", ""),
             "location_dong": location_info.get("dong", ""),
@@ -288,8 +292,27 @@ class DetailPageParser:
 
         return employment_type
 
-    def _build_keywords(self, work_fields: List[str], title: str) -> List[str]:
-        """job_keywords 생성 (work_fields + 제목 토큰)"""
+    def _parse_skills(self, html: str) -> List[str]:
+        """기술 스택 추출 (HARD_SKILL 타입)"""
+        matches = _PATTERNS["skills"].findall(html)
+        # matches는 (name, manualInput) 튜플 리스트
+        skills = []
+        seen = set()
+        for match in matches:
+            skill_name = match[0].strip()
+            if skill_name and skill_name.lower() not in seen:
+                skills.append(skill_name)
+                seen.add(skill_name.lower())
+        return skills
+
+    def _build_keywords(self, work_fields: List[str], title: str, skills: List[str] = None) -> List[str]:
+        """job_keywords 생성 (skills + work_fields + 제목 토큰)
+
+        우선순위: skills(기술스택) > work_fields(직무분류) > title(제목토큰)
+        """
+        if skills is None:
+            skills = []
+
         # 제목에서 토큰 추출
         title_tokens = []
         for raw_token in _PATTERNS["whitespace"].split(title):
@@ -297,10 +320,21 @@ class DetailPageParser:
             if len(token) >= 2 and token.lower() not in _STOPWORDS:
                 title_tokens.append(token)
 
-        # work_fields + 제목 토큰 병합 (중복 제거)
+        # skills + work_fields + 제목 토큰 병합 (중복 제거, skills 우선)
         job_keywords = []
         seen = set()
 
+        # skills를 먼저 추가 (기술스택 우선)
+        for skill in skills:
+            kw = skill.strip()
+            if not kw:
+                continue
+            kw_lower = kw.lower()
+            if kw_lower not in seen:
+                job_keywords.append(kw)
+                seen.add(kw_lower)
+
+        # work_fields + title_tokens 추가
         for keyword in work_fields + title_tokens:
             kw = keyword.strip()
             if not kw or kw.lower() in _STOPWORDS:

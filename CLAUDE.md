@@ -260,15 +260,24 @@ from google.generativeai import ...
 
 > **상세 문서**: `crawler/docs/CRAWLER.md`
 
-**현재 상태 (2026-01-16 업데이트):**
+**현재 상태 (2026-01-17 업데이트):**
 
 | 항목 | 값 |
 |------|-----|
-| 버전 | V2 (httpx + AJAX + 구별 분할) |
+| 버전 | V2.3 (httpx + AJAX + 구별 분할 + skills 추출) |
 | 서울 전체 공고 | ~51,000건 (구별 중복 제거 후) |
 | 수집 가능량 | ~51,000건 전체 (구별 분할로 API 제한 우회) |
 | 수집 속도 | 12-18건/s (30워커, 프록시 풀 30개) |
-| 데이터 품질 | 71.2% (필수 필드 100%) |
+| 데이터 품질 | 90%+ (필수 필드 100%) |
+
+**job_keywords 구성 (V2.3):**
+```
+skills (기술스택) + work_fields (직무분류) + title_tokens (제목 토큰)
+```
+- **skills**: HARD_SKILL 타입 추출 (예: Python, React, AWS)
+- **work_fields**: 잡코리아 직무 분류
+- **title_tokens**: 제목에서 불용어 제외한 토큰
+- **갯수 제한 없음** (검색 정확도 향상)
 
 #### ⚠️ 크롤러 실행 전 필수 확인사항
 
@@ -323,6 +332,8 @@ python test_e2e_quality.py            # 데이터 품질 검증
 - [x] 증분 크롤링 (--skip-existing)
 - [x] 데이터 품질 90%+ 달성
 - [x] 크롤러 파일 통합 정리
+- [x] skills 추출 추가 (HARD_SKILL 타입)
+- [x] job_keywords에 skills 우선 포함, 갯수 제한 제거
 
 **미구현 (배포 시 구현 예정):**
 - [ ] 스케줄러 설정 (systemd timer / cron)
