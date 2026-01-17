@@ -54,7 +54,8 @@ export function JobCardList({ jobs, pagination, onLoadMore, isLoadingMore }: Pro
   }
 
   const showLoadMore = hasMoreLocal || hasMoreServer
-  const remainingCount = hasMoreLocal ? remainingLocal : remainingServer
+  // 전체 남은 건수 = 로컬 미표시 + 서버 미로드
+  const remainingCount = remainingLocal + remainingServer
 
   return (
     <div>
