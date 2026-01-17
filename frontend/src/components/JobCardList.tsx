@@ -15,10 +15,12 @@ export function JobCardList({ jobs, pagination, onLoadMore, isLoadingMore }: Pro
   // 클라이언트 페이지네이션: 10건씩 표시
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
 
-  // 새 검색 시 페이지네이션 리셋
+  // 새 검색 시에만 페이지네이션 리셋 (첫 번째 공고 ID가 바뀌면 새 검색)
+  // 더보기로 추가 로드 시에는 jobs[0]이 동일하므로 리셋되지 않음
+  const searchKey = jobs.length > 0 ? jobs[0].id : null
   useEffect(() => {
     setDisplayCount(ITEMS_PER_PAGE)
-  }, [jobs.length, pagination?.total_count])
+  }, [searchKey])
 
   if (jobs.length === 0) {
     return (
