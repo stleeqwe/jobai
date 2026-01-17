@@ -40,7 +40,7 @@ async def test_data_quality():
     print("-" * 50)
 
     required_fields = ["id", "title", "company_name", "location_full", "url"]
-    optional_fields = ["salary_text", "salary_min", "nearest_station", "job_keywords", "experience_type"]
+    optional_fields = ["salary_text", "salary_min", "job_keywords", "experience_type"]
 
     for field in required_fields + optional_fields:
         non_null = sum(1 for j in sample_jobs if j.get(field))
@@ -101,21 +101,8 @@ async def test_data_quality():
     for gu, cnt in gu_counter.most_common(10):
         print(f"    {gu}: {cnt}건")
 
-    # 최근역 데이터 분석
-    print("\n[5] 최근역 데이터 분석")
-    print("-" * 50)
-
-    station_jobs = [j for j in sample_jobs if j.get("nearest_station")]
-    print(f"  최근역 정보 있음: {len(station_jobs)}건 ({len(station_jobs)/len(sample_jobs)*100:.1f}%)")
-
-    if station_jobs:
-        stations = Counter(j["nearest_station"] for j in station_jobs)
-        print(f"\n  주요 역 (상위 10):")
-        for station, cnt in stations.most_common(10):
-            print(f"    {station}: {cnt}건")
-
     # 직무 키워드 분석
-    print("\n[6] 직무 키워드 분석")
+    print("\n[5] 직무 키워드 분석")
     print("-" * 50)
 
     keyword_jobs = [j for j in sample_jobs if j.get("job_keywords")]
@@ -132,7 +119,7 @@ async def test_data_quality():
             print(f"    {kw}: {cnt}건")
 
     # URL 유효성 검사
-    print("\n[7] URL 유효성 검사")
+    print("\n[6] URL 유효성 검사")
     print("-" * 50)
 
     url_jobs = [j for j in sample_jobs if j.get("url")]
@@ -153,7 +140,6 @@ async def test_data_quality():
         "연봉 정보": len([j for j in sample_jobs if j.get("salary_text")]) / len(sample_jobs) * 100,
         "위치 정보": len(location_jobs) / len(sample_jobs) * 100,
         "서울 비율": len(seoul_jobs) / len(sample_jobs) * 100,
-        "최근역": len(station_jobs) / len(sample_jobs) * 100,
         "키워드": len(keyword_jobs) / len(sample_jobs) * 100,
     }
 

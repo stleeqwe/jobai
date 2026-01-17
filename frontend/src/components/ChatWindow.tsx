@@ -14,7 +14,7 @@ export function ChatWindow() {
     coordinates,
     address,
     loading: locationLoading,
-    error: locationError,
+    error: _locationError,
     permission
   } = useGeolocation()
 
