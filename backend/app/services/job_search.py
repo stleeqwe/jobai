@@ -206,6 +206,9 @@ def format_job_results(jobs: List[JobDict]) -> List[FormattedJobDict]:
             "url": job.get("url", ""),
             "commute_minutes": job.get("commute_minutes"),
             "commute_text": job.get("commute_text", ""),
+            # 디버깅/분석용 필드
+            "job_keywords": job.get("job_keywords", []),
+            "job_type_raw": job.get("job_type_raw", ""),
         }
         results.append(formatted)
 

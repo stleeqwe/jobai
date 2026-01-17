@@ -49,6 +49,15 @@ class JobItem(BaseModel):
         default=None,
         description="통근시간 텍스트 (예: '약 30분')"
     )
+    # 디버깅/분석용 필드
+    job_keywords: List[str] = Field(
+        default_factory=list,
+        description="직무 키워드 (skills + work_fields + title_tokens)"
+    )
+    job_type_raw: str = Field(
+        default="",
+        description="원본 직무 분류"
+    )
 
     class Config:
         populate_by_name = True
