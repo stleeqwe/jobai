@@ -136,6 +136,8 @@ async def _filter_from_db(
             job = doc.to_dict()
 
             # 직무 키워드 매칭
+            # score > 0: 하나 이상의 필드에서 매칭 필요
+            # 역방향 매칭 제거로 무관 공고 필터링
             match_score = calculate_match_score(job, job_keywords)
             if match_score == 0:
                 continue

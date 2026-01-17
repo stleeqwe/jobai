@@ -87,9 +87,10 @@ def _matches_text(nk: NormalizedKeyword, text: str, text_no_space: str) -> bool:
 
 
 def _matches_job_keywords(nk: NormalizedKeyword, job_keywords: Set[str]) -> bool:
-    """키워드가 공고 키워드 집합과 매칭되는지 확인 (양방향 포함)"""
+    """키워드가 공고 키워드 집합과 매칭되는지 확인 (정방향만)"""
     for jk in job_keywords:
-        if nk.lower in jk or nk.no_space in jk or jk in nk.lower or jk in nk.no_space:
+        # 검색 키워드가 공고 키워드에 포함되는지만 확인 (역방향 제거)
+        if nk.lower in jk or nk.no_space in jk:
             return True
     return False
 
