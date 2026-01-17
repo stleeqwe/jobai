@@ -75,7 +75,7 @@ export function ChatWindow() {
             ) : permission === 'denied' ? (
               <span className="flex items-center gap-2 text-amber-600">
                 <span>⚠️</span>
-                위치 권한이 거부됨 - 메시지에 위치를 직접 입력해주세요
+                위치 서비스 필요 - 시스템 설정에서 브라우저 위치 권한을 허용하거나, 메시지에 위치를 입력해주세요
               </span>
             ) : address ? (
               <span className="flex items-center gap-2 text-green-600">

@@ -16,14 +16,14 @@ async def analyze_job_data():
 
     # 환경변수 설정
     os.environ.setdefault('GOOGLE_CLOUD_PROJECT', 'jobchat-1768149763')
-    credentials_path = os.path.expanduser('~/jobchat-credentials.json')
+    credentials_path = os.path.expanduser('~/jobbot-credentials.json')
     if os.path.exists(credentials_path):
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 
     db = firestore.AsyncClient()
 
     print("=" * 60)
-    print("JobChat 채용공고 데이터 분석")
+    print("JobBot 채용공고 데이터 분석")
     print("=" * 60)
 
     # 전체 공고 수

@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="JobChat API",
+    title="JobBot API",
     description="자연어 기반 채용공고 검색 서비스 API - V6 Simple Agentic",
     version="6.0.0",
     lifespan=lifespan
@@ -113,7 +113,7 @@ async def stats():
 async def root():
     """루트 엔드포인트"""
     return {
-        "service": "JobChat API",
+        "service": "JobBot API",
         "version": "6.0.0",
         "architecture": "Simple Agentic",
         "docs": "/docs"

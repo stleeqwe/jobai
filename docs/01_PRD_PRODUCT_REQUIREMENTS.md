@@ -1,4 +1,4 @@
-# JobChat PRD (Product Requirements Document)
+# JobBot PRD (Product Requirements Document)
 
 **Version:** 3.0
 **Last Updated:** 2026-01-13
@@ -9,7 +9,7 @@
 ## 1. 제품 개요
 
 ### 1.1 제품명
-**JobChat (잡챗)** - 자연어 기반 채용공고 검색 서비스
+**JobBot (잡챗)** - 자연어 기반 채용공고 검색 서비스
 
 ### 1.2 제품 비전
 사용자가 복잡한 필터를 조작하지 않고 **자연어 대화**만으로 원하는 채용공고를 찾을 수 있는 AI 기반 검색 서비스

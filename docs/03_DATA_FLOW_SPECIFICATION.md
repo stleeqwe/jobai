@@ -1,4 +1,4 @@
-# JobChat Data Flow Specification
+# JobBot Data Flow Specification
 
 **Version:** 3.0
 **Last Updated:** 2026-01-13
@@ -7,7 +7,7 @@
 
 ## 1. 개요
 
-이 문서는 JobChat 시스템의 데이터 흐름을 상세히 기술합니다.
+이 문서는 JobBot 시스템의 데이터 흐름을 상세히 기술합니다.
 
 ---
 

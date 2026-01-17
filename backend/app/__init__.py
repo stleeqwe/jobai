@@ -1,1 +1,1 @@
-# JobChat Backend API
+# JobBot Backend API

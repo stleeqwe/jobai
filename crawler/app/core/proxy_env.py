@@ -41,13 +41,10 @@ def _get_proxy_settings() -> Tuple[str, int, str, str]:
     return _PROXY_SETTINGS
 
 
-def get_proxy_url(session_id: Optional[str] = None, lifetime: Optional[str] = None) -> str:
+def get_proxy_url(session_id: Optional[str] = None, lifetime: str = "10m") -> str:
     host, port, username, password = _get_proxy_settings()
 
     if session_id:
-        suffix = f"_session-{session_id}"
-        if lifetime:
-            suffix = f"{suffix}_lifetime-{lifetime}"
-        password = f"{password}{suffix}"
+        password = f"{password}_session-{session_id}_lifetime-{lifetime}"
 
     return f"http://{username}:{password}@{host}:{port}"

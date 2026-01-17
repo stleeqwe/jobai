@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# JobChat 로컬 개발 서버 실행 스크립트
+# JobBot 로컬 개발 서버 실행 스크립트
 # 사용법: ./scripts/dev.sh [backend|frontend|all]
 
 set -e

@@ -10,7 +10,7 @@ Phase 1 필드 마이그레이션 스크립트
 - dedup_key: 중복 제거용 MD5 해시
 
 Usage:
-    cd /Users/stlee/Desktop/jobbot/jobai
+    cd /Users/stlee/Desktop/jobbot
     python scripts/migrate_phase1_fields.py
 
     # 드라이런 (실제 저장 안함)
@@ -40,7 +40,7 @@ from app.normalizers.dedup import DedupKeyGenerator
 
 def get_db() -> firestore.Client:
     """Firestore 클라이언트 반환"""
-    return firestore.Client(project="jobchat-1768149763")
+    return firestore.Client(project="jobbot-1768149763")
 
 
 async def migrate_jobs(dry_run: bool = False, limit: int = None):

@@ -1,4 +1,4 @@
-# JobChat Backend Dockerfile
+# JobBot Backend Dockerfile
 FROM python:3.11-slim as builder
 
 WORKDIR /app

@@ -3,12 +3,12 @@
 """
 import asyncio
 import sys
-sys.path.insert(0, '/Users/stlee/Desktop/jobbot/jobai/backend')
+sys.path.insert(0, '/Users/stlee/Desktop/jobbot/backend')
 
 from google.cloud import firestore
 
 async def update_location_full():
-    db = firestore.Client(project="jobchat-1768149763")
+    db = firestore.Client(project="jobbot-1768149763")
     jobs_ref = db.collection("jobs")
 
     # 모든 jobs 가져오기

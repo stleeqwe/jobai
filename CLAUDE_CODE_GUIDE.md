@@ -1,4 +1,4 @@
-# JobChat 프로젝트 개발 가이드
+# JobBot 프로젝트 개발 가이드
 
 > 이 문서는 Claude Code에서 직접 참조하여 개발을 진행할 수 있도록 작성된 상세 가이드입니다.
 
@@ -7,7 +7,7 @@
 ## 프로젝트 개요
 
 ### 서비스명
-JobChat (자연어 기반 채용공고 검색 서비스)
+JobBot (자연어 기반 채용공고 검색 서비스)
 
 ### 핵심 기능
 사용자가 자연어로 채용 조건을 입력하면, AI가 조건을 파싱하여 DB에서 매칭되는 채용공고를 검색하고 결과를 제공합니다. 검색 결과에서 공고를 클릭하면 잡코리아 원본 페이지로 이동합니다.
@@ -46,7 +46,7 @@ AI 응답: "천호동 기준 1시간 이내 출퇴근 가능한 웹디자이너 
 ## 프로젝트 디렉토리 구조
 
 ```
-jobchat/
+jobbot/
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
@@ -276,7 +276,7 @@ jobchat/
 
 ### Base URL
 - 로컬: `http://localhost:8000`
-- 프로덕션: `https://jobchat-api-XXXXX.run.app`
+- 프로덕션: `https://jobbot-api-XXXXX.run.app`
 
 ### Endpoints
 
@@ -532,7 +532,7 @@ from app.routers import chat
 from app.config import settings
 
 app = FastAPI(
-    title="JobChat API",
+    title="JobBot API",
     description="자연어 기반 채용공고 검색 서비스",
     version="1.0.0"
 )
@@ -1445,7 +1445,7 @@ export interface ChatResponse {
 
 ```json
 {
-  "name": "jobchat-frontend",
+  "name": "jobbot-frontend",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -1492,8 +1492,8 @@ npm install -g firebase-tools
 
 ```bash
 # 1. GCP 프로젝트 생성
-gcloud projects create jobchat-project --name="JobChat"
-gcloud config set project jobchat-project
+gcloud projects create jobbot-project --name="JobBot"
+gcloud config set project jobbot-project
 
 # 2. 필요한 API 활성화
 gcloud services enable firestore.googleapis.com
@@ -1506,19 +1506,19 @@ gcloud services enable generativelanguage.googleapis.com
 gcloud firestore databases create --location=asia-northeast3
 
 # 4. 서비스 계정 생성 (로컬 개발용)
-gcloud iam service-accounts create jobchat-dev \
-  --display-name="JobChat Dev"
+gcloud iam service-accounts create jobbot-dev \
+  --display-name="JobBot Dev"
 
-gcloud projects add-iam-policy-binding jobchat-project \
-  --member="serviceAccount:jobchat-dev@jobchat-project.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding jobbot-project \
+  --member="serviceAccount:jobbot-dev@jobbot-project.iam.gserviceaccount.com" \
   --role="roles/datastore.user"
 
 # 5. 키 파일 다운로드
-gcloud iam service-accounts keys create ~/jobchat-key.json \
-  --iam-account=jobchat-dev@jobchat-project.iam.gserviceaccount.com
+gcloud iam service-accounts keys create ~/jobbot-key.json \
+  --iam-account=jobbot-dev@jobbot-project.iam.gserviceaccount.com
 
 # 6. 환경변수 설정
-export GOOGLE_APPLICATION_CREDENTIALS=~/jobchat-key.json
+export GOOGLE_APPLICATION_CREDENTIALS=~/jobbot-key.json
 ```
 
 ### Gemini API 키 발급
@@ -1538,7 +1538,7 @@ pip install -r requirements.txt
 
 # .env 파일 생성
 cat > .env << EOF
-GOOGLE_CLOUD_PROJECT=jobchat-project
+GOOGLE_CLOUD_PROJECT=jobbot-project
 GEMINI_API_KEY=your-api-key-here
 ENVIRONMENT=development
 EOF
@@ -1562,11 +1562,11 @@ npm run dev
 cd backend
 
 # 빌드 및 배포
-gcloud run deploy jobchat-api \
+gcloud run deploy jobbot-api \
   --source . \
   --region asia-northeast3 \
   --allow-unauthenticated \
-  --set-env-vars "GOOGLE_CLOUD_PROJECT=jobchat-project,GEMINI_API_KEY=your-key"
+  --set-env-vars "GOOGLE_CLOUD_PROJECT=jobbot-project,GEMINI_API_KEY=your-key"
 ```
 
 ### Frontend (Firebase Hosting)
@@ -1588,20 +1588,20 @@ firebase deploy --only hosting
 cd crawler
 
 # 이미지 빌드
-gcloud builds submit --tag gcr.io/jobchat-project/jobchat-crawler
+gcloud builds submit --tag gcr.io/jobbot-project/jobbot-crawler
 
 # Job 생성
-gcloud run jobs create jobchat-crawler \
-  --image gcr.io/jobchat-project/jobchat-crawler \
+gcloud run jobs create jobbot-crawler \
+  --image gcr.io/jobbot-project/jobbot-crawler \
   --region asia-northeast3
 
 # 스케줄러 설정 (매일 새벽 3시)
 gcloud scheduler jobs create http crawl-daily \
   --location asia-northeast3 \
   --schedule "0 3 * * *" \
-  --uri "https://asia-northeast3-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/jobchat-project/jobs/jobchat-crawler:run" \
+  --uri "https://asia-northeast3-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/jobbot-project/jobs/jobbot-crawler:run" \
   --http-method POST \
-  --oauth-service-account-email jobchat-dev@jobchat-project.iam.gserviceaccount.com
+  --oauth-service-account-email jobbot-dev@jobbot-project.iam.gserviceaccount.com
 ```
 
 ---

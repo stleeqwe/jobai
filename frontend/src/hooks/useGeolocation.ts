@@ -68,14 +68,18 @@ export function useGeolocation() {
 
     switch (error.code) {
       case error.PERMISSION_DENIED:
-        errorMessage = '위치 권한이 거부되었습니다.'
+        // 시스템 위치 서비스 비활성화 또는 브라우저 권한 거부
+        errorMessage = '위치 권한이 필요합니다. 시스템 설정 > 개인정보 보호 > 위치 서비스에서 브라우저를 허용해주세요.'
         permission = 'denied'
+        console.warn('[Geolocation] PERMISSION_DENIED - 시스템 위치 서비스 또는 브라우저 권한 확인 필요')
         break
       case error.POSITION_UNAVAILABLE:
         errorMessage = '위치 정보를 사용할 수 없습니다.'
+        console.warn('[Geolocation] POSITION_UNAVAILABLE')
         break
       case error.TIMEOUT:
         errorMessage = '위치 요청 시간이 초과되었습니다.'
+        console.warn('[Geolocation] TIMEOUT')
         break
     }
 

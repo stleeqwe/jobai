@@ -1,0 +1,908 @@
+{
+  "timestamp": "2026-01-17T13:17:38.669666",
+  "config": {
+    "job_type": "개발자",
+    "salary": "3500만원"
+  },
+  "summary": {
+    "district": {
+      "success": 20,
+      "total": 25,
+      "rate": 80.0
+    },
+    "station": {
+      "success": 37,
+      "total": 37,
+      "rate": 100.0
+    },
+    "dong": {
+      "success": 19,
+      "total": 19,
+      "rate": 100.0
+    },
+    "total": {
+      "success": 76,
+      "total": 81,
+      "rate": 93.82716049382715
+    },
+    "all_pass": true,
+    "failed": {
+      "districts": [
+        "노원구",
+        "도봉구",
+        "동작구",
+        "양천구",
+        "중랑구"
+      ],
+      "stations": [],
+      "dongs": []
+    }
+  },
+  "details": {
+    "districts": [
+      {
+        "location": "강남구",
+        "job_count": 34,
+        "success": true,
+        "response_time": 7.296715,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "강동구",
+        "job_count": 2,
+        "success": true,
+        "response_time": 6.078511,
+        "sample_locations": [
+          "서울 강동구 고덕비즈밸리로 26 (고덕동, 강동U1센터)",
+          "서울 강동구 상일로 134 (강일동)"
+        ]
+      },
+      {
+        "location": "강북구",
+        "job_count": 2,
+        "success": true,
+        "response_time": 6.265353,
+        "sample_locations": [
+          "서울 강북구 4.19로 109  (수유동)",
+          "서울 강북구 덕릉로40길 74 (번동, 강북전자공단)"
+        ]
+      },
+      {
+        "location": "강서구",
+        "job_count": 12,
+        "success": true,
+        "response_time": 6.986293,
+        "sample_locations": [
+          "서울 강서구 마곡중앙4로 18 (마곡동, 마곡그랑트윈타워)",
+          "서울 강서구 마곡중앙로 165 (마곡동, 프라이빗타워타워1차)",
+          "서울 강서구 공항대로 222 (마곡동, 발산W타워)"
+        ]
+      },
+      {
+        "location": "관악구",
+        "job_count": 1,
+        "success": true,
+        "response_time": 6.177397,
+        "sample_locations": [
+          "서울 관악구 남현3길 61 (남현동, 패스트파이브빌딩)"
+        ]
+      },
+      {
+        "location": "광진구",
+        "job_count": 3,
+        "success": true,
+        "response_time": 6.559424,
+        "sample_locations": [
+          "서울 광진구 아차산로 441 (구의동)",
+          "서울 광진구 광나루로17길 14-8 (군자동)",
+          "서울 광진구 능동로 253 (군자동, 태영빌딩)"
+        ]
+      },
+      {
+        "location": "구로구",
+        "job_count": 15,
+        "success": true,
+        "response_time": 6.002529,
+        "sample_locations": [
+          "서울 구로구 디지털로32길 30 (구로동, 코오롱디지털타워빌란트)",
+          "서울 구로구 디지털로31길 41 (구로동, 이앤씨벤처드림타워6차)",
+          "서울 구로구 디지털로 273 (구로동, 에이스트윈타워2차)"
+        ]
+      },
+      {
+        "location": "금천구",
+        "job_count": 29,
+        "success": true,
+        "response_time": 6.368371,
+        "sample_locations": [
+          "서울 금천구 가산디지털2로 11 (가산동, 에스비지니스센터)",
+          "대한민국 서울특별시 금천구 가산디지털1로 171 가산SKV1센터 1001",
+          "서울 금천구 가산디지털1로 145 (가산동, 에이스하이엔드타워3차)"
+        ]
+      },
+      {
+        "location": "노원구",
+        "job_count": 0,
+        "success": false,
+        "response_time": 5.986388,
+        "sample_locations": []
+      },
+      {
+        "location": "도봉구",
+        "job_count": 0,
+        "success": false,
+        "response_time": 6.014249,
+        "sample_locations": []
+      },
+      {
+        "location": "동대문구",
+        "job_count": 2,
+        "success": true,
+        "response_time": 6.175404,
+        "sample_locations": [
+          "서울 동대문구 답십리로68길 31 (장안동, 공감대6차)",
+          "서울 동대문구 휘경동"
+        ]
+      },
+      {
+        "location": "동작구",
+        "job_count": 0,
+        "success": false,
+        "response_time": 6.174566,
+        "sample_locations": []
+      },
+      {
+        "location": "마포구",
+        "job_count": 9,
+        "success": true,
+        "response_time": 5.524692,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "서대문구",
+        "job_count": 2,
+        "success": true,
+        "response_time": 5.802363,
+        "sample_locations": [
+          "서울 서대문구 통일로 87 (미근동, NH농협생명빌딩)",
+          "서울 서대문구 이화여대길 52 (대현동, 이화여자대학교)"
+        ]
+      },
+      {
+        "location": "서초구",
+        "job_count": 29,
+        "success": true,
+        "response_time": 6.485828,
+        "sample_locations": [
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 반포대로7길 13 (서초동)"
+        ]
+      },
+      {
+        "location": "성동구",
+        "job_count": 11,
+        "success": true,
+        "response_time": 6.553168,
+        "sample_locations": [
+          "서울 성동구 성수일로 77 (성수동1가, 서울숲IT밸리)",
+          "서울 성동구 한림말길 31  (옥수동)",
+          "서울 성동구 아차산로17길 48 (성수동2가, 성수SKV1CENTERI)"
+        ]
+      },
+      {
+        "location": "성북구",
+        "job_count": 1,
+        "success": true,
+        "response_time": 6.45345,
+        "sample_locations": [
+          "서울 성북구 화랑로 262 (석관동)"
+        ]
+      },
+      {
+        "location": "송파구",
+        "job_count": 6,
+        "success": true,
+        "response_time": 6.200864,
+        "sample_locations": [
+          "서울 송파구 올림픽로35가길 11 (신천동, 한신잠실코아)",
+          "서울 송파구 송파대로 201 (문정동, 송파테라타워2)",
+          "서울 송파구 충민로 66 (문정동, 가든파이브라이프)"
+        ]
+      },
+      {
+        "location": "양천구",
+        "job_count": 0,
+        "success": false,
+        "response_time": 6.290795,
+        "sample_locations": []
+      },
+      {
+        "location": "영등포구",
+        "job_count": 11,
+        "success": true,
+        "response_time": 6.872555,
+        "sample_locations": [
+          "서울 영등포구 문래북로 8 (문래동6가, 에이스엔에스타워)",
+          "서울 영등포구 선유서로25길 28 (양평동2가, 영등포디스테이트)",
+          "서울 영등포구 영등포로 150 (당산동1가, 생각공장당산)"
+        ]
+      },
+      {
+        "location": "용산구",
+        "job_count": 4,
+        "success": true,
+        "response_time": 5.419866,
+        "sample_locations": [
+          "서울 용산구 서빙고로 17 (한강로3가)",
+          "서울 용산구 한남대로 57 (한남동)",
+          "서울 용산구 한강대로 366 (동자동, 트윈시티남산)"
+        ]
+      },
+      {
+        "location": "은평구",
+        "job_count": 1,
+        "success": true,
+        "response_time": 5.756575,
+        "sample_locations": [
+          "서울 은평구 통일로 1010 (진관동, 아이파크포레스트게이트)"
+        ]
+      },
+      {
+        "location": "종로구",
+        "job_count": 4,
+        "success": true,
+        "response_time": 6.16724,
+        "sample_locations": [
+          "서울 종로구 세종대로 172 (세종로, 5호선광화문역)",
+          "서울 종로구 청계천로 41 (서린동, 영풍빌딩)",
+          "서울 종로구 새문안로 92 (신문로1가, 광화문오피시아빌딩)"
+        ]
+      },
+      {
+        "location": "중구",
+        "job_count": 8,
+        "success": true,
+        "response_time": 6.389639,
+        "sample_locations": [
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울 중구 퇴계로 126 (충무로2가, 명동역4호선)"
+        ]
+      },
+      {
+        "location": "중랑구",
+        "job_count": 0,
+        "success": false,
+        "response_time": 6.668128,
+        "sample_locations": []
+      }
+    ],
+    "stations": [
+      {
+        "location": "강남역",
+        "job_count": 38,
+        "success": true,
+        "response_time": 6.035958,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "역삼역",
+        "job_count": 34,
+        "success": true,
+        "response_time": 5.890431,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "선릉역",
+        "job_count": 39,
+        "success": true,
+        "response_time": 5.698871,
+        "sample_locations": [
+          "서울 강남구 역삼로 165 (역삼동, 해성빌딩)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "삼성역",
+        "job_count": 48,
+        "success": true,
+        "response_time": 5.722265,
+        "sample_locations": [
+          "서울 강남구 봉은사로26길 12 (역삼동)",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower",
+          "서울 강남구 테헤란로108길 22 (대치동, 서경빌딩)"
+        ]
+      },
+      {
+        "location": "논현역",
+        "job_count": 35,
+        "success": true,
+        "response_time": 5.74832,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "신논현역",
+        "job_count": 39,
+        "success": true,
+        "response_time": 6.407483,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "압구정역",
+        "job_count": 35,
+        "success": true,
+        "response_time": 6.48157,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "서초역",
+        "job_count": 28,
+        "success": true,
+        "response_time": 9.189563,
+        "sample_locations": [
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 반포대로7길 13 (서초동)"
+        ]
+      },
+      {
+        "location": "교대역",
+        "job_count": 36,
+        "success": true,
+        "response_time": 6.148477,
+        "sample_locations": [
+          "서울 서초구 반포대로3길 31 (서초동)",
+          "서울 서초구 강남대로 241 (서초동)",
+          "서울 서초구 강남대로34길 69 (양재동, 이화빌딩)"
+        ]
+      },
+      {
+        "location": "양재역",
+        "job_count": 29,
+        "success": true,
+        "response_time": 5.893249,
+        "sample_locations": [
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 반포대로7길 13 (서초동)"
+        ]
+      },
+      {
+        "location": "잠실역",
+        "job_count": 9,
+        "success": true,
+        "response_time": 6.136902,
+        "sample_locations": [
+          "서울 송파구 올림픽로35가길 11 (신천동, 한신잠실코아)",
+          "서울 송파구 송파대로 201 (문정동, 송파테라타워2)",
+          "서울 송파구 충민로 66 (문정동, 가든파이브라이프)"
+        ]
+      },
+      {
+        "location": "석촌역",
+        "job_count": 13,
+        "success": true,
+        "response_time": 11.34613,
+        "sample_locations": [
+          "서울 송파구 올림픽로35가길 11 (신천동, 한신잠실코아)",
+          "서울 송파구 송파대로 201 (문정동, 송파테라타워2)",
+          "서울 송파구 올림픽로35길 123 (신천동, 향군타워)"
+        ]
+      },
+      {
+        "location": "천호역",
+        "job_count": 2,
+        "success": true,
+        "response_time": 7.427741,
+        "sample_locations": [
+          "서울 강동구 고덕비즈밸리로 26 (고덕동, 강동U1센터)",
+          "서울 강동구 상일로 134 (강일동)"
+        ]
+      },
+      {
+        "location": "건대입구역",
+        "job_count": 3,
+        "success": true,
+        "response_time": 8.968684,
+        "sample_locations": [
+          "서울 광진구 아차산로 441 (구의동)",
+          "서울 광진구 광나루로17길 14-8 (군자동)",
+          "서울 광진구 능동로 253 (군자동, 태영빌딩)"
+        ]
+      },
+      {
+        "location": "홍대입구역",
+        "job_count": 8,
+        "success": true,
+        "response_time": 8.809521,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "합정역",
+        "job_count": 7,
+        "success": true,
+        "response_time": 9.196146,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "상수역",
+        "job_count": 9,
+        "success": true,
+        "response_time": 9.391913,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "망원역",
+        "job_count": 8,
+        "success": true,
+        "response_time": 5.995701,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "여의도역",
+        "job_count": 12,
+        "success": true,
+        "response_time": 5.262201,
+        "sample_locations": [
+          "서울 영등포구 문래북로 8 (문래동6가, 에이스엔에스타워)",
+          "서울 영등포구 선유서로25길 28 (양평동2가, 영등포디스테이트)",
+          "서울 영등포구 영등포로 150 (당산동1가, 생각공장당산)"
+        ]
+      },
+      {
+        "location": "영등포구청역",
+        "job_count": 12,
+        "success": true,
+        "response_time": 13.094287,
+        "sample_locations": [
+          "서울 영등포구 문래북로 8 (문래동6가, 에이스엔에스타워)",
+          "서울 영등포구 선유서로25길 28 (양평동2가, 영등포디스테이트)",
+          "서울 영등포구 영등포로 150 (당산동1가, 생각공장당산)"
+        ]
+      },
+      {
+        "location": "당산역",
+        "job_count": 13,
+        "success": true,
+        "response_time": 9.34758,
+        "sample_locations": [
+          "서울 영등포구 문래북로 8 (문래동6가, 에이스엔에스타워)",
+          "서울 영등포구 선유서로25길 28 (양평동2가, 영등포디스테이트)",
+          "서울 영등포구 영등포로 150 (당산동1가, 생각공장당산)"
+        ]
+      },
+      {
+        "location": "용산역",
+        "job_count": 4,
+        "success": true,
+        "response_time": 9.388175,
+        "sample_locations": [
+          "서울 용산구 서빙고로 17 (한강로3가)",
+          "서울 용산구 한남대로 57 (한남동)",
+          "서울 용산구 한강대로 366 (동자동, 트윈시티남산)"
+        ]
+      },
+      {
+        "location": "이태원역",
+        "job_count": 4,
+        "success": true,
+        "response_time": 7.43849,
+        "sample_locations": [
+          "서울 용산구 서빙고로 17 (한강로3가)",
+          "서울 용산구 한남대로 57 (한남동)",
+          "서울 용산구 한강대로 366 (동자동, 트윈시티남산)"
+        ]
+      },
+      {
+        "location": "광화문역",
+        "job_count": 4,
+        "success": true,
+        "response_time": 9.903894,
+        "sample_locations": [
+          "서울 종로구 세종대로 172 (세종로, 5호선광화문역)",
+          "서울 종로구 청계천로 41 (서린동, 영풍빌딩)",
+          "서울 종로구 새문안로 92 (신문로1가, 광화문오피시아빌딩)"
+        ]
+      },
+      {
+        "location": "종각역",
+        "job_count": 3,
+        "success": true,
+        "response_time": 6.260893,
+        "sample_locations": [
+          "서울 종로구 세종대로 172 (세종로, 5호선광화문역)",
+          "서울 종로구 종로 55 (종로1가, 종각지하철역사)",
+          "서울 종로구 청계천로 41 (서린동, 영풍빌딩)"
+        ]
+      },
+      {
+        "location": "안국역",
+        "job_count": 2,
+        "success": true,
+        "response_time": 10.393523,
+        "sample_locations": [
+          "서울 종로구 세종대로 172 (세종로, 5호선광화문역)",
+          "서울 종로구 종로 55 (종로1가, 종각지하철역사)"
+        ]
+      },
+      {
+        "location": "을지로역",
+        "job_count": 9,
+        "success": true,
+        "response_time": 8.193935,
+        "sample_locations": [
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울 중구 퇴계로 126 (충무로2가, 명동역4호선)"
+        ]
+      },
+      {
+        "location": "명동역",
+        "job_count": 10,
+        "success": true,
+        "response_time": 10.810778,
+        "sample_locations": [
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울 중구 퇴계로 126 (충무로2가, 명동역4호선)"
+        ]
+      },
+      {
+        "location": "충무로역",
+        "job_count": 8,
+        "success": true,
+        "response_time": 8.052275,
+        "sample_locations": [
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울특별시 중구 을지로5길 26  (수하동)",
+          "서울 중구 퇴계로 126 (충무로2가, 명동역4호선)"
+        ]
+      },
+      {
+        "location": "서울역",
+        "job_count": 14,
+        "success": true,
+        "response_time": 5.764943,
+        "sample_locations": [
+          "서울 용산구 서빙고로 17 (한강로3가)",
+          "서울 중구 충정로1가",
+          "서울특별시 중구 을지로5길 26  (수하동)"
+        ]
+      },
+      {
+        "location": "성수역",
+        "job_count": 11,
+        "success": true,
+        "response_time": 6.196296,
+        "sample_locations": [
+          "서울 성동구 성수일로 77 (성수동1가, 서울숲IT밸리)",
+          "서울 성동구 한림말길 31  (옥수동)",
+          "서울 성동구 아차산로17길 48 (성수동2가, 성수SKV1CENTERI)"
+        ]
+      },
+      {
+        "location": "뚝섬역",
+        "job_count": 10,
+        "success": true,
+        "response_time": 6.193445,
+        "sample_locations": [
+          "서울 성동구 성수일로 77 (성수동1가, 서울숲IT밸리)",
+          "서울 성동구 한림말길 31  (옥수동)",
+          "서울 성동구 아차산로17길 48 (성수동2가, 성수SKV1CENTERI)"
+        ]
+      },
+      {
+        "location": "왕십리역",
+        "job_count": 10,
+        "success": true,
+        "response_time": 11.253683,
+        "sample_locations": [
+          "서울 성동구 성수일로 77 (성수동1가, 서울숲IT밸리)",
+          "서울 성동구 한림말길 31  (옥수동)",
+          "서울 성동구 아차산로17길 48 (성수동2가, 성수SKV1CENTERI)"
+        ]
+      },
+      {
+        "location": "가산디지털단지역",
+        "job_count": 29,
+        "success": true,
+        "response_time": 6.257039,
+        "sample_locations": [
+          "서울 금천구 가산디지털2로 11 (가산동, 에스비지니스센터)",
+          "대한민국 서울특별시 금천구 가산디지털1로 171 가산SKV1센터 1001",
+          "서울 금천구 가산디지털1로 145 (가산동, 에이스하이엔드타워3차)"
+        ]
+      },
+      {
+        "location": "구로디지털단지역",
+        "job_count": 13,
+        "success": true,
+        "response_time": 12.242393,
+        "sample_locations": [
+          "서울 구로구 디지털로32길 30 (구로동, 코오롱디지털타워빌란트)",
+          "서울 구로구 디지털로31길 41 (구로동, 이앤씨벤처드림타워6차)",
+          "서울 구로구 디지털로 273 (구로동, 에이스트윈타워2차)"
+        ]
+      },
+      {
+        "location": "독산역",
+        "job_count": 31,
+        "success": true,
+        "response_time": 5.920058,
+        "sample_locations": [
+          "서울 금천구 가산디지털1로 225 (가산동, 에이스가산포휴)",
+          "서울 금천구 가산디지털2로 11 (가산동, 에스비지니스센터)",
+          "서울 금천구 가산동"
+        ]
+      },
+      {
+        "location": "신도림역",
+        "job_count": 13,
+        "success": true,
+        "response_time": 10.287249,
+        "sample_locations": [
+          "서울 구로구 디지털로32길 30 (구로동, 코오롱디지털타워빌란트)",
+          "서울 구로구 디지털로31길 41 (구로동, 이앤씨벤처드림타워6차)",
+          "서울 구로구 디지털로 273 (구로동, 에이스트윈타워2차)"
+        ]
+      }
+    ],
+    "dongs": [
+      {
+        "location": "성수동",
+        "job_count": 9,
+        "success": true,
+        "response_time": 7.005535,
+        "sample_locations": [
+          "서울 성동구 성수일로 77 (성수동1가, 서울숲IT밸리)",
+          "서울 성동구 한림말길 31  (옥수동)",
+          "서울 성동구 아차산로17길 48 (성수동2가, 성수SKV1CENTERI)"
+        ]
+      },
+      {
+        "location": "여의도",
+        "job_count": 13,
+        "success": true,
+        "response_time": 9.344337,
+        "sample_locations": [
+          "서울 영등포구 문래북로 8 (문래동6가, 에이스엔에스타워)",
+          "서울 영등포구 선유서로25길 28 (양평동2가, 영등포디스테이트)",
+          "서울 영등포구 영등포로 150 (당산동1가, 생각공장당산)"
+        ]
+      },
+      {
+        "location": "테헤란로",
+        "job_count": 46,
+        "success": true,
+        "response_time": 8.19594,
+        "sample_locations": [
+          "서울 강남구 봉은사로26길 12 (역삼동)",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower",
+          "서울 강남구 테헤란로108길 22 (대치동, 서경빌딩)"
+        ]
+      },
+      {
+        "location": "삼성동",
+        "job_count": 34,
+        "success": true,
+        "response_time": 6.381182,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "역삼동",
+        "job_count": 36,
+        "success": true,
+        "response_time": 11.273238,
+        "sample_locations": [
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower",
+          "서울 강남구 강남대로 320 (역삼동, 황화빌딩)",
+          "서울 강남구 삼성로133길 15 (청담동, 근정 빌딩)"
+        ]
+      },
+      {
+        "location": "논현동",
+        "job_count": 33,
+        "success": true,
+        "response_time": 6.936397,
+        "sample_locations": [
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower",
+          "서울 강남구 역삼로 160 (역삼동, 강남취창업허브센터)"
+        ]
+      },
+      {
+        "location": "신사동",
+        "job_count": 31,
+        "success": true,
+        "response_time": 6.02747,
+        "sample_locations": [
+          "서울 강남구 논현로 608  (논현동)",
+          "서울 강남구 역삼동",
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower"
+        ]
+      },
+      {
+        "location": "청담동",
+        "job_count": 29,
+        "success": true,
+        "response_time": 5.949303,
+        "sample_locations": [
+          "서울 강남구 테헤란로 431 (삼성동, 저스트코타워(JustCoTower",
+          "서울 강남구 강남대로 320 (역삼동, 황화빌딩)",
+          "서울 강남구 삼성로133길 15 (청담동, 근정 빌딩)"
+        ]
+      },
+      {
+        "location": "서초동",
+        "job_count": 29,
+        "success": true,
+        "response_time": 9.370534,
+        "sample_locations": [
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 반포대로7길 13 (서초동)"
+        ]
+      },
+      {
+        "location": "반포동",
+        "job_count": 29,
+        "success": true,
+        "response_time": 8.362503,
+        "sample_locations": [
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 서초대로27길 56 (방배동, 예일빌딩)",
+          "서울 서초구 반포대로7길 13 (서초동)"
+        ]
+      },
+      {
+        "location": "잠실동",
+        "job_count": 7,
+        "success": true,
+        "response_time": 5.540979,
+        "sample_locations": [
+          "서울 송파구 올림픽로35가길 11 (신천동, 한신잠실코아)",
+          "서울 송파구 송파대로 201 (문정동, 송파테라타워2)",
+          "서울 송파구 충민로 66 (문정동, 가든파이브라이프)"
+        ]
+      },
+      {
+        "location": "문정동",
+        "job_count": 13,
+        "success": true,
+        "response_time": 11.515802,
+        "sample_locations": [
+          "서울 송파구 올림픽로35가길 11 (신천동, 한신잠실코아)",
+          "서울 송파구 송파대로 201 (문정동, 송파테라타워2)",
+          "서울 송파구 올림픽로35길 123 (신천동, 향군타워)"
+        ]
+      },
+      {
+        "location": "가산동",
+        "job_count": 29,
+        "success": true,
+        "response_time": 5.617099,
+        "sample_locations": [
+          "서울 금천구 가산디지털2로 11 (가산동, 에스비지니스센터)",
+          "대한민국 서울특별시 금천구 가산디지털1로 171 가산SKV1센터 1001",
+          "서울 금천구 가산디지털1로 145 (가산동, 에이스하이엔드타워3차)"
+        ]
+      },
+      {
+        "location": "구로동",
+        "job_count": 14,
+        "success": true,
+        "response_time": 12.59926,
+        "sample_locations": [
+          "서울 구로구 디지털로32길 30 (구로동, 코오롱디지털타워빌란트)",
+          "서울 구로구 디지털로 273 (구로동, 에이스트윈타워2차)",
+          "서울 구로구 구로동"
+        ]
+      },
+      {
+        "location": "홍대",
+        "job_count": 14,
+        "success": true,
+        "response_time": 6.136066,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 어울마당로 35 (서교동)",
+          "서울 마포구 마포대로 12  (마포동)"
+        ]
+      },
+      {
+        "location": "망원동",
+        "job_count": 10,
+        "success": true,
+        "response_time": 12.576319,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "합정동",
+        "job_count": 9,
+        "success": true,
+        "response_time": 5.845498,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "상암동",
+        "job_count": 9,
+        "success": true,
+        "response_time": 13.943233,
+        "sample_locations": [
+          "서울 마포구 동교로23길 10 (동교동)",
+          "서울 마포구 마포대로 12  (마포동)",
+          "서울 마포구 성암로 330 (상암동, DMC첨단산업센터)"
+        ]
+      },
+      {
+        "location": "이태원동",
+        "job_count": 4,
+        "success": true,
+        "response_time": 8.779612,
+        "sample_locations": [
+          "서울 용산구 서빙고로 17 (한강로3가)",
+          "서울 용산구 한남대로 57 (한남동)",
+          "서울 용산구 한강대로 366 (동자동, 트윈시티남산)"
+        ]
+      }
+    ]
+  }
+}

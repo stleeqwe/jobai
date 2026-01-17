@@ -54,3 +54,7 @@ service-account*.json
 *.tmp
 *.temp
 .cache/
+
+# Crawler debug files
+crawler/debug/*
+!crawler/debug/.gitkeep

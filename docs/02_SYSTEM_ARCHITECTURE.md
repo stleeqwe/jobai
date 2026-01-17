@@ -1,4 +1,4 @@
-# JobChat System Architecture
+# JobBot System Architecture
 
 **Version:** 3.0
 **Last Updated:** 2026-01-13
@@ -567,7 +567,7 @@ async def get_job_stats() -> Dict[str, Any]:
 **Backend:**
 ```bash
 cd backend
-gcloud run deploy jobchat-api --source . --region=asia-northeast3
+gcloud run deploy jobbot-api --source . --region=asia-northeast3
 ```
 
 **Frontend:**
@@ -580,8 +580,8 @@ firebase deploy --only hosting
 **Crawler:**
 ```bash
 cd crawler
-gcloud run jobs create jobchat-crawler \
-  --image gcr.io/$PROJECT_ID/jobchat-crawler \
+gcloud run jobs create jobbot-crawler \
+  --image gcr.io/$PROJECT_ID/jobbot-crawler \
   --region=asia-northeast3
 ```
 
@@ -607,7 +607,7 @@ ALLOWED_ORIGINS = [
     "http://localhost:5175",
     # ... 5176-5180
     "http://localhost:3000",
-    "https://jobchat.web.app",  # Production
+    "https://jobbot.web.app",  # Production
 ]
 ```
 

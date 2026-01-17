@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# JobChat GCP 환경 설정 스크립트
+# JobBot GCP 환경 설정 스크립트
 # 사용법: ./scripts/setup-gcp.sh [프로젝트ID]
 
 set -e
@@ -12,11 +12,11 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # 프로젝트 ID 설정
-PROJECT_ID=${1:-"jobchat-$(date +%s)"}
+PROJECT_ID=${1:-"jobbot-$(date +%s)"}
 REGION="asia-northeast3"  # 서울
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}JobChat GCP 환경 설정${NC}"
+echo -e "${GREEN}JobBot GCP 환경 설정${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "프로젝트 ID: ${YELLOW}${PROJECT_ID}${NC}"
@@ -36,7 +36,7 @@ echo -e "${YELLOW}[2/7] GCP 프로젝트 생성...${NC}"
 if gcloud projects describe $PROJECT_ID > /dev/null 2>&1; then
     echo -e "${YELLOW}프로젝트가 이미 존재합니다. 기존 프로젝트를 사용합니다.${NC}"
 else
-    gcloud projects create $PROJECT_ID --name="JobChat"
+    gcloud projects create $PROJECT_ID --name="JobBot"
     echo -e "${GREEN}✓ 프로젝트 생성 완료${NC}"
 fi
 
@@ -75,14 +75,14 @@ fi
 
 # 서비스 계정 생성
 echo -e "${YELLOW}[6/7] 서비스 계정 생성...${NC}"
-SA_NAME="jobchat-dev"
+SA_NAME="jobbot-dev"
 SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 if gcloud iam service-accounts describe $SA_EMAIL > /dev/null 2>&1; then
     echo -e "${YELLOW}서비스 계정이 이미 존재합니다.${NC}"
 else
     gcloud iam service-accounts create $SA_NAME \
-        --display-name="JobChat Development"
+        --display-name="JobBot Development"
 fi
 
 # 권한 부여
@@ -97,7 +97,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --quiet
 
 # 키 파일 생성
-KEY_FILE="$HOME/jobchat-credentials.json"
+KEY_FILE="$HOME/jobbot-credentials.json"
 if [ ! -f "$KEY_FILE" ]; then
     gcloud iam service-accounts keys create $KEY_FILE \
         --iam-account=$SA_EMAIL

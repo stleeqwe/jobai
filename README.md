@@ -1,4 +1,4 @@
-# JobChat
+# JobBot
 
 자연어 기반 채용공고 검색 서비스
 
@@ -26,7 +26,7 @@ AI: "강남역 기준 웹디자이너 채용공고 5건을 찾았습니다..."
 ## 프로젝트 구조
 
 ```
-jobchat/
+jobbot/
 ├── backend/          # FastAPI 백엔드
 ├── crawler/          # 잡코리아 크롤러
 ├── frontend/         # React 프론트엔드
@@ -85,13 +85,13 @@ python -m app.main
 
 ```bash
 # Backend (Cloud Run)
-cd backend && gcloud run deploy jobchat-api --source .
+cd backend && gcloud run deploy jobbot-api --source .
 
 # Frontend (Firebase Hosting)
 cd frontend && npm run build && firebase deploy --only hosting
 
 # Crawler (Cloud Run Jobs)
-cd crawler && gcloud run jobs create jobchat-crawler --image gcr.io/$PROJECT_ID/jobchat-crawler
+cd crawler && gcloud run jobs create jobbot-crawler --image gcr.io/$PROJECT_ID/jobbot-crawler
 ```
 
 ## 라이센스

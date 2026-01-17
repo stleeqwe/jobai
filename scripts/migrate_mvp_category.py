@@ -2,7 +2,7 @@
 기존 채용공고 데이터에 mvp_category 필드 추가 및 job_category 재분류
 
 실행 방법:
-    cd /Users/iseungtae/Desktop/jobai
+    cd /Users/stlee/Desktop/jobbot
     source crawler/venv/bin/activate
     python scripts/migrate_mvp_category.py
 """
@@ -174,14 +174,14 @@ async def migrate_data():
 
     # 환경변수 설정
     os.environ.setdefault('GOOGLE_CLOUD_PROJECT', 'jobchat-1768149763')
-    credentials_path = os.path.expanduser('~/jobchat-credentials.json')
+    credentials_path = os.path.expanduser('~/jobbot-credentials.json')
     if os.path.exists(credentials_path):
         os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
 
     db = firestore.AsyncClient()
 
     print("=" * 60)
-    print("JobChat 데이터 마이그레이션")
+    print("JobBot 데이터 마이그레이션")
     print("=" * 60)
 
     # 모든 활성 공고 조회

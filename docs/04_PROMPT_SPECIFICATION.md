@@ -1,4 +1,4 @@
-# JobChat Prompt Specification
+# JobBot Prompt Specification
 
 **Version:** 3.2
 **Last Updated:** 2026-01-13
@@ -8,7 +8,7 @@
 
 ## 1. 개요
 
-이 문서는 JobChat에서 사용하는 모든 AI 프롬프트를 정의합니다.
+이 문서는 JobBot에서 사용하는 모든 AI 프롬프트를 정의합니다.
 
 ### 1.1 프롬프트 목록
 

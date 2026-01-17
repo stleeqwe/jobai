@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# JobChat 배포 스크립트
+# JobBot 배포 스크립트
 # 사용법: ./scripts/deploy.sh [backend|frontend|crawler|all]
 
 set -e
@@ -20,11 +20,11 @@ if [ -f "$PROJECT_ROOT/.env" ]; then
     source "$PROJECT_ROOT/.env"
 fi
 
-PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-jobchat-project}"
+PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-jobbot-project}"
 REGION="${REGION:-asia-northeast3}"
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}JobChat 배포 스크립트${NC}"
+echo -e "${GREEN}JobBot 배포 스크립트${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "프로젝트: ${YELLOW}${PROJECT_ID}${NC}"
@@ -44,7 +44,7 @@ deploy_backend() {
     fi
 
     # Cloud Run 배포
-    gcloud run deploy jobchat-api \
+    gcloud run deploy jobbot-api \
         --source . \
         --region $REGION \
         --platform managed \
@@ -59,7 +59,7 @@ deploy_backend() {
         --project $PROJECT_ID
 
     # 배포된 URL 가져오기
-    BACKEND_URL=$(gcloud run services describe jobchat-api \
+    BACKEND_URL=$(gcloud run services describe jobbot-api \
         --region $REGION \
         --project $PROJECT_ID \
         --format 'value(status.url)')
@@ -76,7 +76,7 @@ deploy_frontend() {
     if [ -f "$PROJECT_ROOT/.backend-url" ]; then
         BACKEND_URL=$(cat "$PROJECT_ROOT/.backend-url")
     else
-        BACKEND_URL=$(gcloud run services describe jobchat-api \
+        BACKEND_URL=$(gcloud run services describe jobbot-api \
             --region $REGION \
             --project $PROJECT_ID \
             --format 'value(status.url)' 2>/dev/null || echo "http://localhost:8000")
@@ -101,18 +101,18 @@ deploy_crawler() {
 
     # 이미지 빌드 및 푸시
     gcloud builds submit \
-        --tag gcr.io/$PROJECT_ID/jobchat-crawler \
+        --tag gcr.io/$PROJECT_ID/jobbot-crawler \
         --project $PROJECT_ID
 
     # Cloud Run Job 생성/업데이트
-    if gcloud run jobs describe jobchat-crawler --region $REGION --project $PROJECT_ID > /dev/null 2>&1; then
-        gcloud run jobs update jobchat-crawler \
-            --image gcr.io/$PROJECT_ID/jobchat-crawler \
+    if gcloud run jobs describe jobbot-crawler --region $REGION --project $PROJECT_ID > /dev/null 2>&1; then
+        gcloud run jobs update jobbot-crawler \
+            --image gcr.io/$PROJECT_ID/jobbot-crawler \
             --region $REGION \
             --project $PROJECT_ID
     else
-        gcloud run jobs create jobchat-crawler \
-            --image gcr.io/$PROJECT_ID/jobchat-crawler \
+        gcloud run jobs create jobbot-crawler \
+            --image gcr.io/$PROJECT_ID/jobbot-crawler \
             --region $REGION \
             --set-env-vars "GOOGLE_CLOUD_PROJECT=$PROJECT_ID,ENVIRONMENT=production" \
             --memory 1Gi \
@@ -128,7 +128,7 @@ deploy_crawler() {
             --location $REGION \
             --schedule "0 18 * * *" \
             --time-zone "UTC" \
-            --uri "https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/jobchat-crawler:run" \
+            --uri "https://${REGION}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${PROJECT_ID}/jobs/jobbot-crawler:run" \
             --http-method POST \
             --oauth-service-account-email "${PROJECT_ID}@appspot.gserviceaccount.com" \
             --project $PROJECT_ID

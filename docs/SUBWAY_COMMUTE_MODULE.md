@@ -546,7 +546,7 @@ def _get_builtin_stations(self) -> List[Dict]:
 
 ```bash
 # E2E 테스트 실행
-cd /Users/stlee/Desktop/jobbot/jobai
+cd /Users/stlee/Desktop/jobbot
 python3 tests/test_e2e_commute.py
 
 # 특정 테스트만

@@ -140,7 +140,7 @@ async def test_parallel_different_sessions(num_workers: int = 5, num_requests: i
     async def worker(worker_id: int, ids: List[str]) -> List[Dict]:
         # 각 워커마다 다른 세션 ID → 다른 IP
         session_id = f"w{worker_id:02d}{random.randint(0, 99999):05d}"
-        proxy_url = get_proxy_url(session_id=session_id)
+        proxy_url = get_proxy_url(session_id=session_id, lifetime="10m")
 
         async with httpx.AsyncClient(
             timeout=30.0,

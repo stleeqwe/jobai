@@ -71,7 +71,7 @@ asyncio.run(check())
 
 ```bash
 # 구별 순차 크롤링 실행
-cd /Users/stlee/Desktop/jobbot/jobai/crawler
+cd /Users/stlee/Desktop/jobbot/crawler
 source venv/bin/activate
 python run_crawl_by_gu.py
 ```
@@ -194,7 +194,7 @@ python run_crawl_by_gu.py
 
 ```bash
 # 전체 실행
-cd /Users/stlee/Desktop/jobbot/jobai/crawler && \
+cd /Users/stlee/Desktop/jobbot/crawler && \
 source venv/bin/activate && \
 python run_crawl_by_gu.py 2>&1 | tee crawl_$(date +%Y%m%d_%H%M%S).log
 ```
