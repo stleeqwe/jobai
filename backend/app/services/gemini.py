@@ -127,8 +127,8 @@ class ConversationMemory:
         self.user_location: Optional[UserLocationDict] = None  # 사용자 위치
 
     def save_search(self, results: List[JobDict], params: SearchParamsDict):
-        """검색 결과 저장 (최대 200건)"""
-        self.last_search_results = results[:200]
+        """검색 결과 저장 (최대 500건)"""
+        self.last_search_results = results[:500]
         self.last_search_params = params
         self.displayed_count = 0
 
