@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Job, PaginationInfo } from '../types'
 import { JobCard } from './JobCard'
 
@@ -15,12 +15,29 @@ export function JobCardList({ jobs, pagination, onLoadMore, isLoadingMore }: Pro
   // 클라이언트 페이지네이션: 10건씩 표시
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE)
 
+  // 서버 로드 감지용 ref
+  const prevJobsLengthRef = useRef(jobs.length)
+  const prevSearchKeyRef = useRef<string | null>(null)
+
   // 새 검색 시에만 페이지네이션 리셋 (첫 번째 공고 ID가 바뀌면 새 검색)
-  // 더보기로 추가 로드 시에는 jobs[0]이 동일하므로 리셋되지 않음
   const searchKey = jobs.length > 0 ? jobs[0].id : null
+
   useEffect(() => {
-    setDisplayCount(ITEMS_PER_PAGE)
-  }, [searchKey])
+    // 새 검색인 경우: 리셋
+    if (searchKey !== prevSearchKeyRef.current) {
+      setDisplayCount(ITEMS_PER_PAGE)
+      prevSearchKeyRef.current = searchKey
+      prevJobsLengthRef.current = jobs.length
+      return
+    }
+
+    // 같은 검색에서 서버 로드로 jobs가 늘어난 경우: 자동으로 다음 페이지 표시
+    if (jobs.length > prevJobsLengthRef.current) {
+      setDisplayCount(prev => Math.min(prev + ITEMS_PER_PAGE, jobs.length))
+    }
+
+    prevJobsLengthRef.current = jobs.length
+  }, [searchKey, jobs.length])
 
   if (jobs.length === 0) {
     return (
